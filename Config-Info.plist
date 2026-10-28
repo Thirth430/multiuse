@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleDisplayName</key>
     <string>Unified Media</string>
     <key>CFBundleIdentifier</key>
@@ -10,6 +12,8 @@
     <string>UnifiedMedia</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
     <key>CFBundleShortVersionString</key>
     <string>0.1</string>
     <key>CFBundleVersion</key>
@@ -17,6 +21,8 @@
     <key>UILaunchScreen</key>
     <dict/>
     <key>LSSupportsOpeningDocumentsInPlace</key>
+    <true/>
+    <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>UIBackgroundModes</key>
     <array>
