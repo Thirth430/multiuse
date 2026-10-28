@@ -1,0 +1,45 @@
+name: UnifiedMedia
+options:
+  bundleIdPrefix: app.unifiedmedia
+  deploymentTarget:
+    iOS: "18.0"
+  xcodeVersion: "26.4"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+targets:
+  UnifiedMedia:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.unifiedmedia.ios
+        INFOPLIST_FILE: Config-Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_STYLE: Automatic
+  UnifiedMediaTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+    dependencies:
+      - target: UnifiedMedia
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.unifiedmedia.ios.tests
+        GENERATE_INFOPLIST_FILE: YES
+        BUNDLE_LOADER: $(TEST_HOST)
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/UnifiedMedia.app/UnifiedMedia
+schemes:
+  UnifiedMedia:
+    build:
+      targets:
+        UnifiedMedia: all
+        UnifiedMediaTests: [test]
+    test:
+      targets:
+        - UnifiedMediaTests

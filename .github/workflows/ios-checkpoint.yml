@@ -1,0 +1,31 @@
+name: iOS checkpoint
+
+on:
+  workflow_dispatch:
+
+jobs:
+  unit-tests:
+    runs-on: macos-latest
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v4
+      - name: Select current stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Run unit tests on an available iPhone simulator
+        run: |
+          SIMULATOR_ID="$(xcrun simctl list devices available --json | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=[device for group in data["devices"].values() for device in group if device.get("isAvailable") and device["name"].startswith("iPhone")]; print(devices[0]["udid"] if devices else "")')"
+          if [ -z "$SIMULATOR_ID" ]; then
+            echo "No available iPhone simulator was found on this runner." >&2
+            exit 1
+          fi
+          xcodebuild test \
+            -project UnifiedMedia.xcodeproj \
+            -scheme UnifiedMedia \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -derivedDataPath "$RUNNER_TEMP/UnifiedMediaDerivedData"
