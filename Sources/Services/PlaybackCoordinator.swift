@@ -5,13 +5,13 @@ import Observation
 @Observable
 final class PlaybackCoordinator {
     let player = AVPlayer()
-    private(set) var currentItem: LibraryItem?
+    private(set) var currentItem: MediaLibraryRecord?
     private(set) var isPlaying = false
     private(set) var elapsedSeconds: Double = 0
     private(set) var durationSeconds: Double = 0
     private(set) var errorMessage: String?
 
-    func play(_ item: LibraryItem) {
+    func play(_ item: MediaLibraryRecord) {
         guard item.kind == .music || item.kind == .video else { return }
         guard FileManager.default.fileExists(atPath: item.localURL.path) else {
             errorMessage = "This file is no longer available in the app library. You can remove it and import it again."

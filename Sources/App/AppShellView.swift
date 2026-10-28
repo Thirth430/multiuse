@@ -20,14 +20,14 @@ private enum MediaPalette {
 struct AppShellView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(PlaybackCoordinator.self) private var playback
-    @Query(sort: \LibraryItem.addedAt, order: .reverse) private var items: [LibraryItem]
+    @Query(sort: \MediaLibraryRecord.addedAt, order: .reverse) private var items: [MediaLibraryRecord]
 
     @State private var section: AppSection = .home
     @State private var showingImporter = false
     @State private var showingSearch = false
     @State private var showingSettings = false
     @State private var showingPlayer = false
-    @State private var selectedItem: LibraryItem?
+    @State private var selectedItem: MediaLibraryRecord?
     @State private var showingDetail = false
     @State private var alertMessage: String?
     @State private var searchText = ""
@@ -211,7 +211,7 @@ struct AppShellView: View {
         }
     }
 
-    private func continueCard(_ item: LibraryItem) -> some View {
+    private func continueCard(_ item: MediaLibraryRecord) -> some View {
         Button { showingPlayer = true } label: {
             VStack(alignment: .leading, spacing: 13) {
                 Label("CONTINUE PLAYING", systemImage: item.kind.symbol)
@@ -228,7 +228,7 @@ struct AppShellView: View {
         .buttonStyle(.plain)
     }
 
-    private func recentCard(_ item: LibraryItem) -> some View {
+    private func recentCard(_ item: MediaLibraryRecord) -> some View {
         Button { open(item) } label: {
             HStack(spacing: 13) {
                 MediaArtwork(kind: item.kind, size: 52)
@@ -311,7 +311,7 @@ struct AppShellView: View {
         .preferredColorScheme(.dark).presentationDetents([.medium, .large])
     }
 
-    private var searchResults: [LibraryItem] {
+    private var searchResults: [MediaLibraryRecord] {
         guard !searchText.isEmpty else { return [] }
         let query = searchText.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
         return items.filter {
@@ -320,7 +320,7 @@ struct AppShellView: View {
         }
     }
 
-    private func open(_ item: LibraryItem) { selectedItem = item; showingDetail = true }
+    private func open(_ item: MediaLibraryRecord) { selectedItem = item; showingDetail = true }
 
     private func categoryGradient(_ kind: MediaKind) -> LinearGradient {
         let colors: [Color]
@@ -335,7 +335,7 @@ struct AppShellView: View {
 }
 
 private struct MediaRow: View {
-    let item: LibraryItem
+    let item: MediaLibraryRecord
     let action: () -> Void
     var body: some View {
         Button(action: action) {
@@ -369,7 +369,7 @@ private struct MediaArtwork: View {
 private struct MediaDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    let item: LibraryItem
+    let item: MediaLibraryRecord
     let play: () -> Void
 
     var body: some View {

@@ -17,7 +17,7 @@ enum LocalMediaImporter {
     /// available after the security-scoped picker URL expires.
     static func importFiles(_ urls: [URL], into context: ModelContext) async -> LocalImportSummary {
         var summary = LocalImportSummary()
-        let directory = LibraryItem.importDirectory
+        let directory = MediaLibraryRecord.importDirectory
 
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -46,7 +46,7 @@ enum LocalMediaImporter {
                     try FileManager.default.copyItem(at: sourceURL, to: URL(fileURLWithPath: destinationPath))
                 }.value
 
-                context.insert(LibraryItem(
+                context.insert(MediaLibraryRecord(
                     kind: kind,
                     title: sourceURL.deletingPathExtension().lastPathComponent,
                     fileName: destinationName,

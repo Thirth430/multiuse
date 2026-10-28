@@ -6,7 +6,7 @@ import XCTest
 final class LocalMediaImporterTests: XCTestCase {
     func testImportsAudioFileIntoPersistentCatalog() async throws {
         let container = try ModelContainer(
-            for: LibraryItem.self,
+            for: MediaLibraryRecord.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let sourceDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -17,20 +17,20 @@ final class LocalMediaImporterTests: XCTestCase {
         try Data([0x49, 0x44, 0x33]).write(to: source)
 
         let summary = await LocalMediaImporter.importFiles([source], into: container.mainContext)
-        let items = try container.mainContext.fetch(FetchDescriptor<LibraryItem>())
+        let items = try container.mainContext.fetch(FetchDescriptor<MediaLibraryRecord>())
 
         XCTAssertEqual(summary.importedCount, 1)
         XCTAssertTrue(summary.failures.isEmpty)
         XCTAssertEqual(items.count, 1)
         XCTAssertEqual(items[0].title, "Late Night")
-        XCTAssertEqual(items[0].kind, .music)
+        XCTAssertEqual(items[0].kind, MediaKind.music)
         XCTAssertTrue(FileManager.default.fileExists(atPath: items[0].localURL.path))
         try? FileManager.default.removeItem(at: items[0].localURL)
     }
 
     func testUnsupportedFileIsReportedWithoutCatalogEntry() async throws {
         let container = try ModelContainer(
-            for: LibraryItem.self,
+            for: MediaLibraryRecord.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let sourceDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -41,7 +41,7 @@ final class LocalMediaImporterTests: XCTestCase {
         try Data("not media".utf8).write(to: source)
 
         let summary = await LocalMediaImporter.importFiles([source], into: container.mainContext)
-        let items = try container.mainContext.fetch(FetchDescriptor<LibraryItem>())
+        let items = try container.mainContext.fetch(FetchDescriptor<MediaLibraryRecord>())
 
         XCTAssertEqual(summary.importedCount, 0)
         XCTAssertEqual(summary.failures.count, 1)

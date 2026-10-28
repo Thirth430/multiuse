@@ -10,6 +10,6 @@ struct UnifiedMediaApp: App {
             AppShellView()
                 .environment(playback)
         }
-        .modelContainer(for: LibraryItem.self)
+        .modelContainer(for: MediaLibraryRecord.self)
     }
 }

@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 /// The shared catalog identity used by all media providers.
-enum MediaKind: String, CaseIterable, Identifiable, Codable, Sendable {
+enum MediaKind: String, CaseIterable, Identifiable, Codable, Equatable, Sendable {
     case music, video, book, game
 
     var id: Self { self }
@@ -26,7 +26,7 @@ enum MediaKind: String, CaseIterable, Identifiable, Codable, Sendable {
 
 /// Normalized media record. Provider identity is retained for future adapters.
 @Model
-final class LibraryItem {
+final class MediaLibraryRecord {
     @Attribute(.unique) var id: String
     var providerID: String
     var origin: String
