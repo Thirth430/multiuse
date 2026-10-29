@@ -1134,6 +1134,10 @@ private struct JellyfinEntryDetailSheet: View {
     @State private var albumTracks: [JellyfinLibraryEntry] = []
     @State private var isLoadingAlbumTracks = false
     @State private var albumTracksError: String?
+    @State private var artistAlbums: [JellyfinLibraryEntry] = []
+    @State private var isLoadingArtistAlbums = false
+    @State private var artistAlbumsError: String?
+    @State private var selectedArtistAlbum: JellyfinLibraryEntry?
 
     private var isFavorite: Bool {
         jellyfin.entries.first(where: { $0.id == item.id })?.isFavorite ?? item.isFavorite
@@ -1200,6 +1204,34 @@ private struct JellyfinEntryDetailSheet: View {
                             }
                         }
                     }
+                    if item.isArtist {
+                        VStack(alignment: .leading, spacing: 9) {
+                            Text("Albums").font(.system(size: 16, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                            if isLoadingArtistAlbums {
+                                ProgressView("Loading albums…").tint(MediaPalette.accent)
+                            } else if let artistAlbumsError {
+                                Text(artistAlbumsError).font(.system(size: 12, design: .rounded)).foregroundStyle(.red)
+                            } else if artistAlbums.isEmpty {
+                                Text("This artist has no available albums.").font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
+                            } else {
+                                ForEach(artistAlbums) { album in
+                                    Button { selectedArtistAlbum = album } label: {
+                                        HStack(spacing: 10) {
+                                            MediaArtwork(kind: .music, size: 42, artworkURL: album.imageURL)
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                Text(album.title).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1)
+                                                Text(album.creator).font(.system(size: 10, design: .rounded)).foregroundStyle(MediaPalette.muted).lineLimit(1)
+                                            }
+                                            Spacer(minLength: 4)
+                                            Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(MediaPalette.muted)
+                                        }
+                                        .padding(8).background(MediaPalette.surface.opacity(0.65), in: RoundedRectangle(cornerRadius: 13))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
                     Button {
                         Task { await jellyfin.setFavorite(itemID: item.id, isFavorite: !isFavorite) }
                     } label: {
@@ -1249,8 +1281,8 @@ private struct JellyfinEntryDetailSheet: View {
                         .disabled(isStartingPlayback)
                     } else {
                         Label(
-                            item.isAlbum ? "Choose a track above to play" : item.kind == .book ? "Server books are browse-only here" : "This server item can’t be played here",
-                            systemImage: item.isAlbum ? "music.note.list" : "info.circle"
+                            item.isAlbum ? "Choose a track above to play" : item.isArtist ? "Choose an album above to browse tracks" : item.kind == .book ? "Server books are browse-only here" : "This server item can’t be played here",
+                            systemImage: item.isAlbum ? "music.note.list" : item.isArtist ? "music.mic" : "info.circle"
                         )
                             .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
                             .padding(13).frame(maxWidth: .infinity, alignment: .leading).background(MediaPalette.surface, in: RoundedRectangle(cornerRadius: 14))
@@ -1264,20 +1296,36 @@ private struct JellyfinEntryDetailSheet: View {
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
         }
         .preferredColorScheme(.dark).presentationDetents([.medium, .large])
+        .sheet(item: $selectedArtistAlbum) { album in
+            JellyfinEntryDetailSheet(item: album) {
+                dismiss()
+                onPlaybackStarted()
+            }
+        }
         .fullScreenCover(isPresented: $showingGamePlayer) {
             if let gameConfiguration {
                 JellyEmuGamePlayer(configuration: gameConfiguration)
             }
         }
         .task(id: item.id) {
-            guard item.isAlbum else { return }
-            isLoadingAlbumTracks = true
-            albumTracksError = nil
-            defer { isLoadingAlbumTracks = false }
-            do {
-                albumTracks = try await jellyfin.tracks(in: item)
-            } catch {
-                albumTracksError = "Could not load album tracks: \(error.localizedDescription)"
+            if item.isAlbum {
+                isLoadingAlbumTracks = true
+                albumTracksError = nil
+                defer { isLoadingAlbumTracks = false }
+                do {
+                    albumTracks = try await jellyfin.tracks(in: item)
+                } catch {
+                    albumTracksError = "Could not load album tracks: \(error.localizedDescription)"
+                }
+            } else if item.isArtist {
+                isLoadingArtistAlbums = true
+                artistAlbumsError = nil
+                defer { isLoadingArtistAlbums = false }
+                do {
+                    artistAlbums = try await jellyfin.albums(for: item)
+                } catch {
+                    artistAlbumsError = "Could not load artist albums: \(error.localizedDescription)"
+                }
             }
         }
     }

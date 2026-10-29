@@ -10,6 +10,7 @@ struct JellyfinLibraryEntry: Identifiable, Equatable {
     let creator: String
     let kind: MediaKind
     let isAlbum: Bool
+    let isArtist: Bool
     let gameSystem: String?
     let overview: String
     let durationSeconds: Double
@@ -123,7 +124,7 @@ final class JellyfinProvider {
                     limit: pageSize,
                     isRecursive: true,
                     fields: [.tags],
-                    includeItemTypes: [.audio, .audioBook, .book, .episode, .movie, .musicAlbum, .video],
+                    includeItemTypes: [.audio, .audioBook, .book, .episode, .movie, .musicAlbum, .musicArtist, .video],
                     enableUserData: true,
                     imageTypeLimit: 1,
                     enableImageTypes: [.primary],
@@ -155,6 +156,7 @@ final class JellyfinProvider {
                     creator: creator,
                     kind: kind,
                     isAlbum: item.type == .musicAlbum,
+                    isArtist: item.type == .musicArtist,
                     gameSystem: gameSystem,
                     overview: item.overview ?? "",
                     durationSeconds: Double(item.runTimeTicks ?? 0) / 10_000_000,
@@ -204,6 +206,7 @@ final class JellyfinProvider {
                     creator: item.albumArtist ?? item.artists?.joined(separator: ", ") ?? album.creator,
                     kind: .music,
                     isAlbum: false,
+                    isArtist: false,
                     gameSystem: nil,
                     overview: item.overview ?? "",
                     durationSeconds: Double(item.runTimeTicks ?? 0) / 10_000_000,
@@ -218,6 +221,56 @@ final class JellyfinProvider {
                   response.value.totalRecordCount.map({ startIndex < $0 }) ?? true else { break }
         }
         return tracks
+    }
+
+    func albums(for artist: JellyfinLibraryEntry) async throws -> [JellyfinLibraryEntry] {
+        guard artist.isArtist, let client, let userID else {
+            throw JellyfinProviderError.playbackUnavailable
+        }
+
+        let pageSize = 200
+        var startIndex = 0
+        var albums: [JellyfinLibraryEntry] = []
+        while true {
+            let parameters = Paths.GetItemsParameters(
+                userID: userID,
+                startIndex: startIndex,
+                limit: pageSize,
+                isRecursive: true,
+                parentID: artist.id,
+                fields: [.tags],
+                includeItemTypes: [.musicAlbum],
+                enableUserData: true,
+                imageTypeLimit: 1,
+                enableImageTypes: [.primary],
+                enableTotalRecordCount: true,
+                enableImages: true
+            )
+            let response = try await client.send(Paths.getItems(parameters: parameters))
+            let page = response.value.items ?? []
+            albums.append(contentsOf: page.compactMap { item in
+                guard let id = item.id, let title = item.name else { return nil }
+                return JellyfinLibraryEntry(
+                    id: id,
+                    title: title,
+                    creator: item.albumArtist ?? artist.title,
+                    kind: .music,
+                    isAlbum: true,
+                    isArtist: false,
+                    gameSystem: nil,
+                    overview: item.overview ?? "",
+                    durationSeconds: Double(item.runTimeTicks ?? 0) / 10_000_000,
+                    resumeSeconds: Double(item.userData?.playbackPositionTicks ?? 0) / 10_000_000,
+                    isFavorite: item.userData?.isFavorite ?? false,
+                    isPlayable: false,
+                    imageURL: imageURL(for: item, serverURL: client.configuration.url)
+                )
+            })
+            startIndex += page.count
+            guard page.count == pageSize,
+                  response.value.totalRecordCount.map({ startIndex < $0 }) ?? true else { break }
+        }
+        return albums
     }
 
     func disconnect() async {
@@ -405,7 +458,7 @@ final class JellyfinProvider {
     private func mediaKind(for itemType: BaseItemKind?) -> MediaKind? {
         guard let itemType else { return nil }
         switch itemType {
-        case .audio, .musicAlbum:
+        case .audio, .musicAlbum, .musicArtist:
             return MediaKind.music
         case .audioBook, .book:
             return MediaKind.book
