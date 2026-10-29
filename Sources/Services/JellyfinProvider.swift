@@ -339,14 +339,28 @@ final class JellyfinProvider {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
-        let playbackInfo = try await client.send(Paths.getPlaybackInfo(itemID: item.id, userID: userID)).value
+        let playbackInfoRequest = Paths.getPostedPlaybackInfo(
+            itemID: item.id,
+            parameters: .init(userID: userID),
+            PlaybackInfoDto(
+                allowAudioStreamCopy: true,
+                allowVideoStreamCopy: true,
+                deviceProfile: iosDeviceProfile,
+                enableDirectPlay: true,
+                enableDirectStream: true,
+                enableTranscoding: true,
+                maxAudioChannels: 2,
+                userID: userID
+            )
+        )
+        let playbackInfo = try await client.send(playbackInfoRequest).value
         guard let mediaSource = playbackInfo.mediaSources?.first else {
             throw JellyfinProviderError.noMediaSource
         }
 
-        let streamURL: URL?
+        let directStreamURL: URL?
         if item.kind == .video {
-            streamURL = client.url(
+            directStreamURL = client.url(
                 with: Paths.getVideoStream(
                     itemID: item.id,
                     parameters: .init(
@@ -358,7 +372,7 @@ final class JellyfinProvider {
                 queryAPIKey: true
             )
         } else {
-            streamURL = client.url(
+            directStreamURL = client.url(
                 with: Paths.getAudioStream(
                     itemID: item.id,
                     parameters: .init(
@@ -369,6 +383,19 @@ final class JellyfinProvider {
                 ),
                 queryAPIKey: true
             )
+        }
+        let needsTranscoding = mediaSource.isSupportsDirectPlay == false
+            && mediaSource.isSupportsDirectStream == false
+        let streamURL: URL?
+        if needsTranscoding {
+            guard let transcodingURL = mediaSource.transcodingURL.flatMap({
+                normalizedTranscodingURL($0, serverURL: client.configuration.url)
+            }) else {
+                throw JellyfinProviderError.transcodingUnavailable
+            }
+            streamURL = transcodingURL
+        } else {
+            streamURL = directStreamURL
         }
         guard let streamURL else {
             throw JellyfinProviderError.invalidStreamURL
@@ -511,6 +538,57 @@ final class JellyfinProvider {
         ]
         return components?.url
     }
+
+    private var iosDeviceProfile: DeviceProfile {
+        DeviceProfile(
+            directPlayProfiles: [
+                DirectPlayProfile(audioCodec: "mp3,aac,alac,pcm_s16le,flac", container: "mp3,m4a,aac,wav,flac", type: .audio),
+                DirectPlayProfile(audioCodec: "aac,alac", container: "mp4,m4v,mov", type: .video, videoCodec: "h264,hevc"),
+            ],
+            name: "Unified Media iOS",
+            subtitleProfiles: [
+                SubtitleProfile(format: "vtt", method: .hls),
+                SubtitleProfile(format: "srt", method: .external),
+            ],
+            transcodingProfiles: [
+                TranscodingProfile(protocol: .hls, audioCodec: "aac", container: "ts", context: .streaming, maxAudioChannels: "2", type: .audio),
+                TranscodingProfile(protocol: .hls, audioCodec: "aac", container: "ts", context: .streaming, enableSubtitlesInManifest: true, maxAudioChannels: "2", type: .video, videoCodec: "h264"),
+            ]
+        )
+    }
+
+    private func normalizedTranscodingURL(_ rawValue: String, serverURL: URL) -> URL? {
+        guard var components = URLComponents(string: rawValue),
+              let server = URLComponents(url: serverURL, resolvingAgainstBaseURL: false),
+              let serverHost = server.host else { return nil }
+
+        if components.scheme == nil {
+            components.scheme = server.scheme
+            components.host = server.host
+            components.port = server.port
+        }
+        let serverPort = server.port ?? (server.scheme?.lowercased() == "https" ? 443 : 80)
+        let streamPort = components.port ?? (components.scheme?.lowercased() == "https" ? 443 : 80)
+        guard components.scheme?.caseInsensitiveCompare(server.scheme ?? "") == .orderedSame,
+              components.host?.caseInsensitiveCompare(serverHost) == .orderedSame,
+              streamPort == serverPort else { return nil }
+
+        let basePath = server.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let streamPath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if !basePath.isEmpty,
+           streamPath != basePath,
+           !streamPath.hasPrefix(basePath + "/") {
+            components.path = "/\(basePath)/\(streamPath)"
+        }
+
+        var queryItems = components.queryItems ?? []
+        if !queryItems.contains(where: { $0.name.caseInsensitiveCompare("api_key") == .orderedSame }),
+           let accessToken {
+            queryItems.append(URLQueryItem(name: "api_key", value: accessToken))
+        }
+        components.queryItems = queryItems
+        return components.url
+    }
 }
 
 private struct JellyfinCredentials: Codable {
@@ -575,6 +653,7 @@ private enum JellyfinProviderError: LocalizedError {
     case secureStorage(OSStatus)
     case playbackUnavailable
     case noMediaSource
+    case transcodingUnavailable
     case invalidStreamURL
 
     var errorDescription: String? {
@@ -587,6 +666,8 @@ private enum JellyfinProviderError: LocalizedError {
             "This server item is not playable here. Music and video tracks can be played; books and albums are browse-only."
         case .noMediaSource:
             "The Jellyfin server did not provide a playable media source for this item."
+        case .transcodingUnavailable:
+            "The Jellyfin server cannot play this source directly and did not provide a compatible HLS stream."
         case .invalidStreamURL:
             "The Jellyfin server returned an invalid stream address."
         }
