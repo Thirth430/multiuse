@@ -15,6 +15,11 @@
 - [x] Add a manually triggered GitHub Actions workflow and first importer unit tests.
 - [x] Adapt LocalMusic metadata tags and embedded artwork into shared records and artwork rendering; extend import recognition to FLAC and Opus.
 - [x] Add a shared playback queue, previous/next controls, lock-screen/remote commands, now-playing metadata, audio interruption handling, and headphone-removal pause behavior.
+- [x] Add persistent local music playlists with create/edit/delete, reorderable track membership, playlist browsing, and playlist queue playback.
+- [x] Add grouped album and artist browsing with detail lists and queue playback.
+- [x] Add a playlist persistence unit test for ordered track IDs.
+- [ ] Verify playlist persistence, edits, deleted or unavailable tracks, and playlist queue progression on the GitHub iOS runner/device.
+- [ ] Verify album and artist grouping/detail playback on the GitHub iOS runner/device.
 - [ ] Verify music tags/artwork, queue progression, background controls, interruptions, and supported formats on the GitHub iOS runner/device.
 - [ ] Verify import/play/resume/unavailable-file behavior on an iOS device or simulator.
 
@@ -39,9 +44,11 @@
 
 ## Phase 5 — Video engine decision
 
+- [x] Add embedded audio and subtitle selection for AVPlayer-supported video assets.
+- [ ] Verify selectable tracks on sample local and Jellyfin assets; external subtitle loading remains unimplemented.
 - [ ] Compare AVPlayer format coverage with the desired formats using sample files.
 - [ ] Review MPVKit binary provenance, transitive licenses, distribution size, and thermal behavior.
-- [ ] Add subtitle/audio track controls and resume only after selecting and validating an engine.
+- [ ] Decide whether MPVKit's LGPL product is needed for formats AVPlayer cannot play, then validate its iOS integration and distribution costs.
 
 ## Phase 6 — Retro games and optional signature feature
 

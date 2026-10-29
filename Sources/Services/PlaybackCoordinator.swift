@@ -12,6 +12,8 @@ final class PlaybackCoordinator {
     private(set) var elapsedSeconds: Double = 0
     private(set) var durationSeconds: Double = 0
     private(set) var errorMessage: String?
+    private(set) var videoAudioTrackTitles: [String] = []
+    private(set) var videoSubtitleTrackTitles: [String] = []
     @ObservationIgnored private var remoteSession: JellyfinPlaybackSession?
     @ObservationIgnored private var remoteProvider: JellyfinProvider?
     @ObservationIgnored private var lastRemoteProgressReport = Date.distantPast
@@ -19,6 +21,10 @@ final class PlaybackCoordinator {
     @ObservationIgnored private var queueIndex = 0
     @ObservationIgnored private var notificationTokens: [NSObjectProtocol] = []
     @ObservationIgnored private var shouldResumeAfterInterruption = false
+    @ObservationIgnored private var videoAudioGroup: AVMediaSelectionGroup?
+    @ObservationIgnored private var videoSubtitleGroup: AVMediaSelectionGroup?
+    @ObservationIgnored private var videoAudioOptions: [AVMediaSelectionOption] = []
+    @ObservationIgnored private var videoSubtitleOptions: [AVMediaSelectionOption] = []
 
     init() {
         configureRemoteCommands()
@@ -98,7 +104,17 @@ final class PlaybackCoordinator {
 
         currentItem = item
         item.lastOpenedAt = .now
-        player.replaceCurrentItem(with: AVPlayerItem(url: url))
+        videoAudioGroup = nil
+        videoSubtitleGroup = nil
+        videoAudioOptions = []
+        videoSubtitleOptions = []
+        videoAudioTrackTitles = []
+        videoSubtitleTrackTitles = []
+        let playerItem = AVPlayerItem(url: url)
+        player.replaceCurrentItem(with: playerItem)
+        if item.kind == .video {
+            Task { await loadVideoTrackOptions(from: playerItem.asset, itemID: item.id) }
+        }
         if position > 0 {
             player.seek(to: CMTime(seconds: position, preferredTimescale: 600))
         }
@@ -149,6 +165,31 @@ final class PlaybackCoordinator {
         updateNowPlayingInfo()
     }
 
+    func selectVideoAudioTrack(_ index: Int) {
+        guard videoAudioOptions.indices.contains(index), let group = videoAudioGroup else { return }
+        player.currentItem?.select(videoAudioOptions[index], in: group)
+    }
+
+    func selectVideoSubtitleTrack(_ index: Int?) {
+        guard let group = videoSubtitleGroup else { return }
+        let option = index.flatMap { videoSubtitleOptions.indices.contains($0) ? videoSubtitleOptions[$0] : nil }
+        player.currentItem?.select(option, in: group)
+    }
+
+    private func loadVideoTrackOptions(from asset: AVAsset, itemID: String) async {
+        async let audioResult = try? asset.loadMediaSelectionGroup(for: .audible)
+        async let subtitleResult = try? asset.loadMediaSelectionGroup(for: .legible)
+        let (audioGroup, subtitleGroup) = await (audioResult, subtitleResult)
+        guard currentItem?.id == itemID else { return }
+
+        videoAudioGroup = audioGroup
+        videoSubtitleGroup = subtitleGroup
+        videoAudioOptions = audioGroup?.options ?? []
+        videoSubtitleOptions = subtitleGroup?.options ?? []
+        videoAudioTrackTitles = videoAudioOptions.map(\.displayName)
+        videoSubtitleTrackTitles = videoSubtitleOptions.map(\.displayName)
+    }
+
     func refreshProgress() {
         guard let currentItem else { return }
         let elapsed = player.currentTime().seconds
@@ -190,6 +231,12 @@ final class PlaybackCoordinator {
         durationSeconds = 0
         queue = []
         queueIndex = 0
+        videoAudioGroup = nil
+        videoSubtitleGroup = nil
+        videoAudioOptions = []
+        videoSubtitleOptions = []
+        videoAudioTrackTitles = []
+        videoSubtitleTrackTitles = []
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 

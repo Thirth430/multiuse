@@ -11,6 +11,18 @@ private enum AppSection: String, CaseIterable, Identifiable {
     var symbol: String { self == .home ? "sparkles" : MediaKind(rawValue: rawValue)?.symbol ?? "square.grid.2x2" }
 }
 
+private enum MusicBrowseMode: String, CaseIterable, Identifiable {
+    case songs, albums, artists, playlists
+    var id: Self { self }
+    var title: String { rawValue.capitalized }
+}
+
+private struct MusicCollectionSelection: Identifiable {
+    let id = UUID()
+    let title: String
+    let tracks: [MediaLibraryRecord]
+}
+
 private enum MediaPalette {
     static let background = Color(red: 0.035, green: 0.047, blue: 0.075)
     static let surface = Color(red: 0.085, green: 0.102, blue: 0.145)
@@ -23,6 +35,7 @@ struct AppShellView: View {
     @Environment(PlaybackCoordinator.self) private var playback
     @Environment(JellyfinProvider.self) private var jellyfin
     @Query(sort: \MediaLibraryRecord.addedAt, order: .reverse) private var items: [MediaLibraryRecord]
+    @Query(sort: \MusicPlaylist.updatedAt, order: .reverse) private var playlists: [MusicPlaylist]
 
     @State private var section: AppSection = .home
     @State private var showingImporter = false
@@ -30,6 +43,12 @@ struct AppShellView: View {
     @State private var showingSettings = false
     @State private var showingPlayer = false
     @State private var showingJellyfinLibrary = false
+    @State private var showingPlaylistEditor = false
+    @State private var showingPlaylistDetail = false
+    @State private var musicBrowseMode: MusicBrowseMode = .songs
+    @State private var editingPlaylist: MusicPlaylist?
+    @State private var selectedPlaylist: MusicPlaylist?
+    @State private var selectedMusicCollection: MusicCollectionSelection?
     @State private var selectedItem: MediaLibraryRecord?
     @State private var showingDetail = false
     @State private var alertMessage: String?
@@ -68,6 +87,42 @@ struct AppShellView: View {
         .sheet(isPresented: $showingSettings) { SettingsSheet() }
         .sheet(isPresented: $showingPlayer) { NowPlayingSheet() }
         .sheet(isPresented: $showingJellyfinLibrary) { JellyfinLibrarySheet() }
+        .sheet(isPresented: $showingPlaylistEditor) {
+            MusicPlaylistEditorSheet(
+                tracks: items.filter { $0.kind == .music },
+                playlist: editingPlaylist
+            ) { name, selectedIDs in
+                if let editingPlaylist {
+                    editingPlaylist.name = name
+                    editingPlaylist.itemIDs = selectedIDs
+                } else {
+                    modelContext.insert(MusicPlaylist(name: name, itemIDs: selectedIDs))
+                }
+                do { try modelContext.save() }
+                catch { alertMessage = "The playlist could not be saved: \(error.localizedDescription)" }
+            }
+        }
+        .sheet(isPresented: $showingPlaylistDetail) {
+            if let selectedPlaylist {
+                MusicPlaylistDetailSheet(
+                    playlist: selectedPlaylist,
+                    tracks: items.filter { $0.kind == .music }
+                ) { tracks, index in
+                    guard tracks.indices.contains(index) else { return }
+                    playback.play(tracks[index], queue: tracks, startIndex: index)
+                    showingPlaylistDetail = false
+                    showingPlayer = true
+                }
+            }
+        }
+        .sheet(item: $selectedMusicCollection) { collection in
+            MusicCollectionDetailSheet(title: collection.title, tracks: collection.tracks) { tracks, index in
+                guard tracks.indices.contains(index) else { return }
+                playback.play(tracks[index], queue: tracks, startIndex: index)
+                selectedMusicCollection = nil
+                showingPlayer = true
+            }
+        }
         .sheet(isPresented: $showingDetail) {
             if let selectedItem {
                 MediaDetailSheet(item: selectedItem) {
@@ -185,13 +240,31 @@ struct AppShellView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(section.title).font(.system(size: 29, weight: .bold, design: .rounded)).foregroundStyle(.white)
                 Spacer()
+                if section == .music {
+                    Button {
+                        editingPlaylist = nil
+                        showingPlaylistEditor = true
+                    } label: {
+                        Label("Playlist", systemImage: "plus").font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(MediaPalette.accent)
+                    }
+                }
                 if section != .game {
                     Button { showingImporter = true } label: {
                         Label("Import", systemImage: "plus").font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(MediaPalette.accent)
                     }
                 }
             }
-            if collection.isEmpty { collectionEmptyState(for: kind) }
+            if section == .music {
+                musicBrowsePicker
+                switch musicBrowseMode {
+                case .songs:
+                    if collection.isEmpty { collectionEmptyState(for: kind) }
+                    else { ForEach(collection, id: \.id) { item in MediaRow(item: item) { open(item) } } }
+                case .albums: groupedMusicRows(collection, by: \.collection, fallback: "Unknown Album")
+                case .artists: groupedMusicRows(collection, by: \.creator, fallback: "Unknown Artist")
+                case .playlists: musicPlaylistSection
+                }
+            } else if collection.isEmpty { collectionEmptyState(for: kind) }
             else { ForEach(collection, id: \.id) { item in MediaRow(item: item) { open(item) } } }
             if section == .game {
                 Text("Game runtime is planned. No emulator cores or game files are bundled.")
@@ -200,6 +273,108 @@ struct AppShellView: View {
             }
         }
         .padding(.top, 8)
+    }
+
+    private var musicBrowsePicker: some View {
+        HStack(spacing: 5) {
+            ForEach(MusicBrowseMode.allCases) { mode in
+                Button { musicBrowseMode = mode } label: {
+                    Text(mode.title).font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(musicBrowseMode == mode ? MediaPalette.background : MediaPalette.muted)
+                        .frame(maxWidth: .infinity).padding(.vertical, 9)
+                        .background(musicBrowseMode == mode ? MediaPalette.accent : MediaPalette.surface, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(4).background(MediaPalette.surface.opacity(0.62), in: Capsule())
+    }
+
+    @ViewBuilder
+    private func groupedMusicRows(_ tracks: [MediaLibraryRecord], by keyPath: KeyPath<MediaLibraryRecord, String>, fallback: String) -> some View {
+        let groups = Dictionary(grouping: tracks) { item in
+            let value = item[keyPath: keyPath].trimmingCharacters(in: .whitespacesAndNewlines)
+            return value.isEmpty ? fallback : value
+        }
+        if groups.isEmpty {
+            Text("Import tracks with album or artist tags to browse this view.")
+                .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
+                .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                .background(MediaPalette.surface, in: RoundedRectangle(cornerRadius: 14))
+        } else {
+            ForEach(groups.keys.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }, id: \.self) { title in
+                let groupTracks = (groups[title] ?? []).sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+                if let first = groupTracks.first {
+                    Button { selectedMusicCollection = MusicCollectionSelection(title: title, tracks: groupTracks) } label: {
+                        HStack(spacing: 11) {
+                            MediaArtwork(kind: .music, size: 48, artworkURL: first.artworkURL)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(title).font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1)
+                                Text("\(groupTracks.count) songs · \(first.creator.isEmpty ? "Local library" : first.creator)")
+                                    .font(.system(size: 10, design: .rounded)).foregroundStyle(MediaPalette.muted).lineLimit(1)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(MediaPalette.muted)
+                        }
+                        .padding(9).background(MediaPalette.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 15))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var musicPlaylistSection: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack {
+                Text("Playlists").font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                Spacer()
+                Text("\(playlists.count)").font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(MediaPalette.muted)
+            }
+            if playlists.isEmpty {
+                Text("Create a playlist from your imported tracks.")
+                    .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
+                    .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(MediaPalette.surface, in: RoundedRectangle(cornerRadius: 14))
+            } else {
+                ForEach(playlists, id: \.id) { playlist in
+                    HStack(spacing: 10) {
+                        Button {
+                            selectedPlaylist = playlist
+                            showingPlaylistDetail = true
+                        } label: {
+                            HStack(spacing: 11) {
+                                Image(systemName: "music.note.list").font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(MediaPalette.accent).frame(width: 40, height: 40)
+                                    .background(MediaPalette.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 12))
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(playlist.name).font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1)
+                                    Text("\(playlist.itemIDs.count) tracks").font(.system(size: 10, design: .rounded)).foregroundStyle(MediaPalette.muted)
+                                }
+                                Spacer()
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        Menu {
+                            Button("Edit playlist", systemImage: "pencil") {
+                                editingPlaylist = playlist
+                                showingPlaylistEditor = true
+                            }
+                            Button("Delete playlist", systemImage: "trash", role: .destructive) {
+                                modelContext.delete(playlist)
+                                try? modelContext.save()
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis").font(.system(size: 14, weight: .semibold)).foregroundStyle(MediaPalette.muted)
+                                .frame(width: 36, height: 40).contentShape(Rectangle())
+                        }
+                    }
+                    .padding(.leading, 11).padding(.trailing, 5).padding(.vertical, 5)
+                    .background(MediaPalette.surface.opacity(0.8), in: RoundedRectangle(cornerRadius: 15))
+                }
+            }
+        }
     }
 
     private var emptyLibrary: some View {
@@ -487,7 +662,10 @@ private struct NowPlayingSheet: View {
                 Button { dismiss() } label: { Image(systemName: "chevron.down").font(.system(size: 13, weight: .bold)).foregroundStyle(.white).padding(9).background(MediaPalette.surface, in: Circle()) }
             }
             if let item = playback.currentItem {
-                if item.kind == .video { VideoPlayer(player: playback.player).frame(height: 230).clipShape(RoundedRectangle(cornerRadius: 18)) }
+                if item.kind == .video {
+                    VideoPlayer(player: playback.player).frame(height: 230).clipShape(RoundedRectangle(cornerRadius: 18))
+                    videoTrackControls
+                }
                 else { MediaArtwork(kind: item.kind, size: 180, artworkURL: item.artworkURL).frame(maxWidth: .infinity).padding(.vertical, 13) }
                 VStack(alignment: .leading, spacing: 5) {
                     Text(item.title).font(.system(size: 21, weight: .bold, design: .rounded)).foregroundStyle(.white).lineLimit(2)
@@ -519,6 +697,35 @@ private struct NowPlayingSheet: View {
     private func timeLabel(_ seconds: Double) -> String {
         guard seconds.isFinite, seconds >= 0 else { return "0:00" }
         return "\(Int(seconds) / 60):\(String(format: "%02d", Int(seconds) % 60))"
+    }
+
+    @ViewBuilder
+    private var videoTrackControls: some View {
+        if playback.videoAudioTrackTitles.count > 1 || !playback.videoSubtitleTrackTitles.isEmpty {
+            HStack(spacing: 10) {
+                if playback.videoAudioTrackTitles.count > 1 {
+                    Menu {
+                        ForEach(Array(playback.videoAudioTrackTitles.enumerated()), id: \.offset) { index, title in
+                            Button(title) { playback.selectVideoAudioTrack(index) }
+                        }
+                    } label: {
+                        Label("Audio", systemImage: "speaker.wave.2").font(.system(size: 11, weight: .semibold, design: .rounded))
+                    }
+                }
+                if !playback.videoSubtitleTrackTitles.isEmpty {
+                    Menu {
+                        Button("Off") { playback.selectVideoSubtitleTrack(nil) }
+                        ForEach(Array(playback.videoSubtitleTrackTitles.enumerated()), id: \.offset) { index, title in
+                            Button(title) { playback.selectVideoSubtitleTrack(index) }
+                        }
+                    } label: {
+                        Label("Subtitles", systemImage: "captions.bubble").font(.system(size: 11, weight: .semibold, design: .rounded))
+                    }
+                }
+                Spacer()
+            }
+            .foregroundStyle(MediaPalette.accent)
+        }
     }
 }
 
@@ -714,5 +921,182 @@ private struct JellyfinEntryRow: View {
                 Image(systemName: "server.rack").font(.system(size: 11)).foregroundStyle(MediaPalette.muted)
             }
             .padding(9).background(MediaPalette.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 15))
+    }
+}
+
+private struct MusicPlaylistEditorSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let tracks: [MediaLibraryRecord]
+    let playlist: MusicPlaylist?
+    let onSave: (String, [String]) -> Void
+    @State private var name: String
+    @State private var selectedIDs: Set<String>
+
+    init(tracks: [MediaLibraryRecord], playlist: MusicPlaylist?, onSave: @escaping (String, [String]) -> Void) {
+        self.tracks = tracks
+        self.playlist = playlist
+        self.onSave = onSave
+        _name = State(initialValue: playlist?.name ?? "")
+        _selectedIDs = State(initialValue: Set(playlist?.itemIDs ?? []))
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Playlist") {
+                    TextField("Name", text: $name)
+                        .textInputAutocapitalization(.words)
+                }
+                Section("Tracks · \(selectedIDs.count) selected") {
+                    if tracks.isEmpty {
+                        Text("Import music before creating a playlist.").foregroundStyle(.secondary)
+                    } else {
+                        ForEach(tracks, id: \.id) { track in
+                            Button {
+                                if selectedIDs.contains(track.id) { selectedIDs.remove(track.id) }
+                                else { selectedIDs.insert(track.id) }
+                            } label: {
+                                HStack(spacing: 11) {
+                                    MediaArtwork(kind: .music, size: 42, artworkURL: track.artworkURL)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(track.title).font(.system(size: 13, weight: .semibold, design: .rounded)).lineLimit(1)
+                                        Text(track.creator.isEmpty ? track.collection : track.creator).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                                    }
+                                    Spacer(minLength: 5)
+                                    Image(systemName: selectedIDs.contains(track.id) ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(selectedIDs.contains(track.id) ? MediaPalette.accent : .secondary)
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .navigationTitle(playlist == nil ? "New Playlist" : "Edit Playlist")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") {
+                        onSave(name.trimmingCharacters(in: .whitespacesAndNewlines), tracks.map(\.id).filter(selectedIDs.contains))
+                        dismiss()
+                    }
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
+private struct MusicPlaylistDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    let playlist: MusicPlaylist
+    let tracks: [MediaLibraryRecord]
+    let play: ([MediaLibraryRecord], Int) -> Void
+    @State private var orderedIDs: [String]
+
+    init(playlist: MusicPlaylist, tracks: [MediaLibraryRecord], play: @escaping ([MediaLibraryRecord], Int) -> Void) {
+        self.playlist = playlist
+        self.tracks = tracks
+        self.play = play
+        let availableIDs = Set(tracks.map(\.id))
+        _orderedIDs = State(initialValue: playlist.itemIDs.filter(availableIDs.contains))
+    }
+
+    private var orderedTracks: [MediaLibraryRecord] {
+        let recordsByID = Dictionary(uniqueKeysWithValues: tracks.map { ($0.id, $0) })
+        return orderedIDs.compactMap { recordsByID[$0] }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    if orderedTracks.isEmpty {
+                        ContentUnavailableView("No available tracks", systemImage: "music.note.list", description: Text("Edit this playlist to add tracks from your music library."))
+                    } else {
+                        ForEach(Array(orderedTracks.enumerated()), id: \.element.id) { index, track in
+                            Button { play(orderedTracks, index) } label: {
+                                HStack(spacing: 11) {
+                                    MediaArtwork(kind: .music, size: 42, artworkURL: track.artworkURL)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(track.title).font(.system(size: 13, weight: .semibold, design: .rounded)).lineLimit(1)
+                                        Text(track.creator.isEmpty ? "Unknown Artist" : track.creator).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .onMove { source, destination in
+                            orderedIDs.move(fromOffsets: source, toOffset: destination)
+                            playlist.itemIDs = orderedIDs
+                            try? modelContext.save()
+                        }
+                    }
+                } header: {
+                    Text("\(orderedTracks.count) tracks")
+                }
+            }
+            .navigationTitle(playlist.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .topBarTrailing) { EditButton() }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        guard !orderedTracks.isEmpty else { return }
+                        play(orderedTracks, 0)
+                    } label: { Image(systemName: "play.fill") }
+                    .disabled(orderedTracks.isEmpty)
+                    .accessibilityLabel("Play playlist")
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
+private struct MusicCollectionDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: String
+    let tracks: [MediaLibraryRecord]
+    let play: ([MediaLibraryRecord], Int) -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("\(tracks.count) songs") {
+                    ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
+                        Button { play(tracks, index) } label: {
+                            HStack(spacing: 11) {
+                                MediaArtwork(kind: .music, size: 42, artworkURL: track.artworkURL)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(track.title).font(.system(size: 13, weight: .semibold, design: .rounded)).lineLimit(1)
+                                    Text(track.creator.isEmpty ? "Unknown Artist" : track.creator).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        guard !tracks.isEmpty else { return }
+                        play(tracks, 0)
+                    } label: { Image(systemName: "play.fill") }
+                    .disabled(tracks.isEmpty)
+                    .accessibilityLabel("Play collection")
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
     }
 }

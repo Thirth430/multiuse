@@ -94,3 +94,32 @@ final class MediaLibraryRecord {
             .appendingPathComponent("UnifiedMedia/Imports", isDirectory: true)
     }
 }
+
+/// A persistent ordered playlist of local music records. Store stable library
+/// IDs as JSON so playlist order survives relaunches without duplicating tracks.
+@Model
+final class MusicPlaylist {
+    @Attribute(.unique) var id: String
+    var name: String
+    var itemIDsJSON: String
+    var createdAt: Date
+    var updatedAt: Date
+
+    init(id: String = UUID().uuidString, name: String, itemIDs: [String] = [], createdAt: Date = .now) {
+        self.id = id
+        self.name = name
+        self.itemIDsJSON = (try? String(data: JSONEncoder().encode(itemIDs), encoding: .utf8)) ?? "[]"
+        self.createdAt = createdAt
+        self.updatedAt = createdAt
+    }
+
+    var itemIDs: [String] {
+        get { (try? JSONDecoder().decode([String].self, from: Data(itemIDsJSON.utf8))) ?? [] }
+        set {
+            itemIDsJSON = (try? String(data: JSONEncoder().encode(newValue), encoding: .utf8)) ?? "[]"
+            updatedAt = .now
+        }
+    }
+
+    var identifiableID: String { id }
+}

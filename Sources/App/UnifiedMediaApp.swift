@@ -12,6 +12,6 @@ struct UnifiedMediaApp: App {
                 .environment(playback)
                 .environment(jellyfin)
         }
-        .modelContainer(for: MediaLibraryRecord.self)
+        .modelContainer(for: [MediaLibraryRecord.self, MusicPlaylist.self])
     }
 }
