@@ -734,6 +734,7 @@ private struct NowPlayingSheet: View {
                     Button { playback.playNext() } label: { Image(systemName: "forward.end.fill") }
                 }
                 .font(.system(size: 20, weight: .medium)).foregroundStyle(.white)
+                UpNextQueuePanel(playback: playback)
                 if let error = playback.errorMessage { Text(error).font(.system(size: 12, design: .rounded)).foregroundStyle(.orange) }
             }
             Spacer(minLength: 0)
@@ -773,6 +774,82 @@ private struct NowPlayingSheet: View {
                 Spacer()
             }
             .foregroundStyle(MediaPalette.accent)
+        }
+    }
+}
+
+private struct UpNextQueuePanel: View {
+    let playback: PlaybackCoordinator
+    @State private var isExpanded = false
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
+            } label: {
+                HStack(spacing: 9) {
+                    Label("Up Next", systemImage: "list.bullet")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(.white)
+                    Spacer()
+                    Text("\(playback.upcomingItems.count)").font(.system(size: 11, weight: .medium, design: .rounded)).foregroundStyle(MediaPalette.muted)
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down").font(.system(size: 10, weight: .bold)).foregroundStyle(MediaPalette.muted)
+                }
+                .padding(.top, 5).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if isExpanded {
+                if playback.upcomingItems.isEmpty {
+                    Text("Nothing queued after this item.")
+                        .font(.system(size: 11, design: .rounded)).foregroundStyle(MediaPalette.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 5)
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 7) {
+                            ForEach(Array(playback.upcomingItems.enumerated()), id: \.offset) { offset, queuedItem in
+                                HStack(spacing: 9) {
+                                    Button {
+                                        playback.playQueuedItem(at: playback.currentQueueIndex + offset + 1)
+                                    } label: {
+                                        HStack(spacing: 9) {
+                                            MediaArtwork(kind: queuedItem.kind, size: 38, artworkURL: queuedItem.artworkURL)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(queuedItem.title).font(.system(size: 11, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1)
+                                                Text(queuedItem.creator.isEmpty ? queuedItem.kind.title : queuedItem.creator)
+                                                    .font(.system(size: 9, design: .rounded)).foregroundStyle(MediaPalette.muted).lineLimit(1)
+                                            }
+                                        }
+                                        .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                    Menu {
+                                        if offset > 0 {
+                                            Button("Move to next", systemImage: "arrow.up.to.line") {
+                                                playback.moveUpcomingItem(from: offset, to: 0)
+                                            }
+                                            Button("Move up", systemImage: "arrow.up") {
+                                                playback.moveUpcomingItem(from: offset, to: offset - 1)
+                                            }
+                                        }
+                                        if offset + 1 < playback.upcomingItems.count {
+                                            Button("Move down", systemImage: "arrow.down") {
+                                                playback.moveUpcomingItem(from: offset, to: offset + 1)
+                                            }
+                                        }
+                                        Button("Remove from queue", systemImage: "trash", role: .destructive) {
+                                            playback.removeUpcomingItem(at: offset)
+                                        }
+                                    } label: {
+                                        Image(systemName: "ellipsis").font(.system(size: 12, weight: .semibold))
+                                            .foregroundStyle(MediaPalette.muted).frame(width: 30, height: 38)
+                                    }
+                                }
+                                .padding(7).background(MediaPalette.surface.opacity(0.75), in: RoundedRectangle(cornerRadius: 12))
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 180)
+                }
+            }
         }
     }
 }

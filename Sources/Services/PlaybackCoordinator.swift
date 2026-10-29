@@ -17,14 +17,20 @@ final class PlaybackCoordinator {
     @ObservationIgnored private var remoteSession: JellyfinPlaybackSession?
     @ObservationIgnored private var remoteProvider: JellyfinProvider?
     @ObservationIgnored private var lastRemoteProgressReport = Date.distantPast
-    @ObservationIgnored private var queue: [MediaLibraryRecord] = []
-    @ObservationIgnored private var queueIndex = 0
+    private var queue: [MediaLibraryRecord] = []
+    private var queueIndex = 0
     @ObservationIgnored private var notificationTokens: [NSObjectProtocol] = []
     @ObservationIgnored private var shouldResumeAfterInterruption = false
     @ObservationIgnored private var videoAudioGroup: AVMediaSelectionGroup?
     @ObservationIgnored private var videoSubtitleGroup: AVMediaSelectionGroup?
     @ObservationIgnored private var videoAudioOptions: [AVMediaSelectionOption] = []
     @ObservationIgnored private var videoSubtitleOptions: [AVMediaSelectionOption] = []
+
+    var currentQueueIndex: Int { queueIndex }
+    var upcomingItems: [MediaLibraryRecord] {
+        guard queueIndex + 1 < queue.count else { return [] }
+        return Array(queue.dropFirst(queueIndex + 1))
+    }
 
     init() {
         configureRemoteCommands()
@@ -142,6 +148,26 @@ final class PlaybackCoordinator {
         guard !queue.isEmpty else { return }
         queueIndex = (queueIndex + 1) % queue.count
         play(queue[queueIndex], queue: queue, startIndex: queueIndex)
+    }
+
+    func playQueuedItem(at index: Int) {
+        guard queue.indices.contains(index) else { return }
+        play(queue[index], queue: queue, startIndex: index)
+    }
+
+    func moveUpcomingItem(from source: Int, to destination: Int) {
+        let startIndex = queueIndex + 1
+        let upcomingCount = queue.count - startIndex
+        guard source >= 0, source < upcomingCount,
+              destination >= 0, destination < upcomingCount else { return }
+        let item = queue.remove(at: startIndex + source)
+        queue.insert(item, at: startIndex + destination)
+    }
+
+    func removeUpcomingItem(at index: Int) {
+        let absoluteIndex = queueIndex + 1 + index
+        guard absoluteIndex > queueIndex, queue.indices.contains(absoluteIndex) else { return }
+        queue.remove(at: absoluteIndex)
     }
 
     private func advanceAfterCompletion() {

@@ -16,6 +16,7 @@
 - [x] Add a manually triggered GitHub Actions workflow and first importer unit tests.
 - [x] Adapt LocalMusic metadata tags and embedded artwork into shared records and artwork rendering; extend import recognition to FLAC and Opus.
 - [x] Add a shared playback queue, previous/next controls, lock-screen/remote commands, now-playing metadata, audio interruption handling, and headphone-removal pause behavior.
+- [x] Add an Up Next panel to the player with queue selection, reordering, and removal controls.
 - [x] Add persistent local music playlists with create/edit/delete, reorderable track membership, playlist browsing, and playlist queue playback.
 - [x] Add grouped album and artist browsing with detail lists and queue playback.
 - [x] Add a playlist persistence unit test for ordered track IDs.
