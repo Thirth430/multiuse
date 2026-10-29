@@ -115,6 +115,7 @@ struct ReadiumBookReader: View {
     @State private var showingContents = false
     @State private var showingBookmarks = false
     @State private var comicNavigationRequest: Locator?
+    @State private var navigationError: String?
 
     init(item: MediaLibraryRecord) {
         _session = State(initialValue: ReadiumReaderSession(item: item))
@@ -138,6 +139,7 @@ struct ReadiumBookReader: View {
                             fontFamily: selectedFontFamily,
                             fontSize: fontSize,
                             onLocationChange: session.update,
+                            onError: { navigationError = $0.localizedDescription },
                             onReady: { navigator = $0 }
                         )
                         .ignoresSafeArea(edges: .bottom)
@@ -191,6 +193,14 @@ struct ReadiumBookReader: View {
             }
             .sheet(isPresented: $showingContents) { contentsSheet }
             .sheet(isPresented: $showingBookmarks) { bookmarksSheet }
+            .alert("Reader error", isPresented: Binding(
+                get: { navigationError != nil },
+                set: { if !$0 { navigationError = nil } }
+            )) {
+                Button("OK", role: .cancel) { navigationError = nil }
+            } message: {
+                Text(navigationError ?? "The reader encountered a problem.")
+            }
         }
         .task { await session.open() }
     }
@@ -365,10 +375,11 @@ private struct ReadiumNavigatorContainer: UIViewControllerRepresentable {
     let fontFamily: FontFamily
     let fontSize: Double
     let onLocationChange: (Locator) -> Void
+    let onError: (NavigatorError) -> Void
     let onReady: (EPUBNavigatorViewController) -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onLocationChange: onLocationChange, onReady: onReady)
+        Coordinator(onLocationChange: onLocationChange, onError: onError, onReady: onReady)
     }
 
     func makeUIViewController(context: Context) -> UIViewController {
@@ -412,6 +423,7 @@ private struct ReadiumNavigatorContainer: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
         context.coordinator.onLocationChange = onLocationChange
+        context.coordinator.onError = onError
         context.coordinator.onReady = onReady
         guard let navigator = uiViewController as? EPUBNavigatorViewController else { return }
         guard context.coordinator.appliedFontFamily != fontFamily || context.coordinator.appliedFontSize != fontSize else { return }
@@ -443,20 +455,27 @@ private struct ReadiumNavigatorContainer: UIViewControllerRepresentable {
     final class Coordinator: NSObject, EPUBNavigatorDelegate {
         weak var navigator: EPUBNavigatorViewController?
         var onLocationChange: (Locator) -> Void
+        var onError: (NavigatorError) -> Void
         var onReady: (EPUBNavigatorViewController) -> Void
         var appliedFontFamily: FontFamily?
         var appliedFontSize: Double?
 
         init(
             onLocationChange: @escaping (Locator) -> Void,
+            onError: @escaping (NavigatorError) -> Void,
             onReady: @escaping (EPUBNavigatorViewController) -> Void
         ) {
             self.onLocationChange = onLocationChange
+            self.onError = onError
             self.onReady = onReady
         }
 
         func navigator(_ navigator: ReadiumNavigator.Navigator, locationDidChange locator: Locator) {
             onLocationChange(locator)
+        }
+
+        func navigator(_ navigator: ReadiumNavigator.Navigator, presentError error: NavigatorError) {
+            onError(error)
         }
     }
 }
