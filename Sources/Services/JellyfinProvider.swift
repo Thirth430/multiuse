@@ -176,10 +176,14 @@ final class JellyfinProvider {
     private func mediaKind(for itemType: BaseItemKind?) -> MediaKind? {
         guard let itemType else { return nil }
         switch itemType {
-        case .audio, .musicAlbum: .music
-        case .audioBook, .book: .book
-        case .episode, .movie, .musicVideo, .video: .video
-        default: nil
+        case .audio, .musicAlbum:
+            return MediaKind.music
+        case .audioBook, .book:
+            return MediaKind.book
+        case .episode, .movie, .musicVideo, .video:
+            return MediaKind.video
+        default:
+            return nil
         }
     }
 
