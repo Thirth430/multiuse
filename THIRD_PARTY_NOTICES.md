@@ -20,6 +20,15 @@ Redistribution and use in source and binary forms, with or without modification,
 
 Permission is granted, free of charge, to any person obtaining a copy of this software and associated documentation files, to deal in the software without restriction, including the rights to use, copy, modify, merge, publish, distribute, sublicense, and sell copies, subject to including this copyright notice and permission notice in substantial portions. The software is provided without warranty or liability. The complete license text is in the upstream repository's `LICENSE` file.
 
+## Jellyfin Swift SDK
+
+- Source: [jellyfin/jellyfin-sdk-swift](https://github.com/jellyfin/jellyfin-sdk-swift)
+- Revision: `e69dd0358ad33148aded867661e27d71de29d0c3`
+- License: Mozilla Public License 2.0
+- Copyright: Copyright (c) 2026 Jellyfin & Jellyfin Contributors
+
+The SDK is included as the `JellyfinAPI` Swift package product. Its upstream `LICENSE.md` contains the full MPL-2.0 text. Include that text in the distributed app's legal notices and retain source availability/notice obligations for any covered modifications.
+
 ## Other checked-out projects
 
-Jellyfin Swift SDK (MPL-2.0), LocalMusic (MPL-2.0), MPVKit's LGPL/GPL product variants, and RetroArch (GPL-3.0) have been assessed but are not linked into this app target yet. Their licenses and all transitive dependencies must be reviewed before integration or distribution. RetroArch cores are separate projects with separate licenses.
+LocalMusic (MPL-2.0), MPVKit's LGPL/GPL product variants, and RetroArch (GPL-3.0) have been assessed but are not linked into this app target yet. Their licenses and all transitive dependencies must be reviewed before integration or distribution. RetroArch cores are separate projects with separate licenses.

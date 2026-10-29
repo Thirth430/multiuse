@@ -25,11 +25,14 @@
 - [ ] Verify EPUB/CBZ rendering, restored positions, bookmarks, and font injection on the GitHub iOS simulator.
 - [ ] Retain the verified CBR limitation unless a separate implementation is selected.
 
-## Phase 4 — Jellyfin server provider
+## Phase 4 — Jellyfin server provider (in progress)
 
-- [ ] Add server connection, auth/discovery, secure account storage, and source filters.
-- [ ] Normalize server metadata and artwork into the shared catalog projection.
-- [ ] Connect remote playback, session reporting, and resume progress.
+- [x] Add the checked-out Jellyfin Swift SDK as a pinned Swift package dependency.
+- [x] Add manual URL and username/password sign-in and save the returned session token in iOS Keychain (password is not retained).
+- [x] Fetch server audio, albums, videos, episodes, and books and normalize title, creator, category, duration, and primary-artwork URL for the shared search/library UI.
+- [x] Add server browsing, media-type filters, local-plus-server search, refresh, and disconnect controls.
+- [ ] Verify package resolution, authentication, artwork, pagination, and network failures with a live Jellyfin server on the GitHub runner/device.
+- [ ] Add remote playback, session reporting, and server resume progress; remote catalog entries are browse-only in this checkpoint.
 
 ## Phase 5 — Video engine decision
 
@@ -45,4 +48,4 @@
 
 ## Verification policy
 
-This project is being edited on Windows without Xcode or iOS Simulator. No iOS build or simulator test has been claimed. The checkpoint workflow is `.github/workflows/ios-checkpoint.yml`, and this project has an `origin` remote. After the Readium changes are committed and pushed, the user should run the workflow and share its result before platform-specific fixes are treated as verified.
+This project is being edited on Windows without Xcode or iOS Simulator. No iOS build or simulator test has been claimed for the Jellyfin changes. The checkpoint workflow is `.github/workflows/ios-checkpoint.yml`, and this project has an `origin` remote. After the Jellyfin changes are committed and pushed, the user should run the workflow and share its result before platform-specific fixes are treated as verified. Live-server behavior also needs a real Jellyfin server account and network test.

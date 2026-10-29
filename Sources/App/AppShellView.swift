@@ -20,6 +20,7 @@ private enum MediaPalette {
 struct AppShellView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(PlaybackCoordinator.self) private var playback
+    @Environment(JellyfinProvider.self) private var jellyfin
     @Query(sort: \MediaLibraryRecord.addedAt, order: .reverse) private var items: [MediaLibraryRecord]
 
     @State private var section: AppSection = .home
@@ -27,6 +28,7 @@ struct AppShellView: View {
     @State private var showingSearch = false
     @State private var showingSettings = false
     @State private var showingPlayer = false
+    @State private var showingJellyfinLibrary = false
     @State private var selectedItem: MediaLibraryRecord?
     @State private var showingDetail = false
     @State private var alertMessage: String?
@@ -64,6 +66,7 @@ struct AppShellView: View {
         .sheet(isPresented: $showingSearch) { searchSheet }
         .sheet(isPresented: $showingSettings) { SettingsSheet() }
         .sheet(isPresented: $showingPlayer) { NowPlayingSheet() }
+        .sheet(isPresented: $showingJellyfinLibrary) { JellyfinLibrarySheet() }
         .sheet(isPresented: $showingDetail) {
             if let selectedItem {
                 MediaDetailSheet(item: selectedItem) {
@@ -77,6 +80,7 @@ struct AppShellView: View {
             Button("OK", role: .cancel) { alertMessage = nil }
         } message: { Text(alertMessage ?? "") }
         .onReceive(progressTimer) { _ in playback.refreshProgress() }
+        .task { await jellyfin.restoreConnection() }
     }
 
     private var header: some View {
@@ -139,6 +143,8 @@ struct AppShellView: View {
                 }
             }
 
+            if jellyfin.isConnected { jellyfinServerCard }
+
             if items.isEmpty { emptyLibrary }
             else {
                 VStack(alignment: .leading, spacing: 13) {
@@ -147,6 +153,26 @@ struct AppShellView: View {
                 }
             }
         }
+    }
+
+    private var jellyfinServerCard: some View {
+        Button { showingJellyfinLibrary = true } label: {
+            HStack(spacing: 13) {
+                Image(systemName: "server.rack")
+                    .font(.system(size: 17, weight: .semibold)).foregroundStyle(MediaPalette.accent)
+                    .frame(width: 42, height: 42).background(MediaPalette.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 13))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(jellyfin.connectedServerName ?? "Jellyfin server")
+                        .font(.system(size: 14, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                    Text("\(jellyfin.entries.count) server items · Browse library")
+                        .font(.system(size: 10, design: .rounded)).foregroundStyle(MediaPalette.muted)
+                }
+                Spacer()
+                Image(systemName: "arrow.up.right").font(.system(size: 11, weight: .bold)).foregroundStyle(MediaPalette.muted)
+            }
+            .padding(13).background(MediaPalette.surface, in: RoundedRectangle(cornerRadius: 17))
+        }
+        .buttonStyle(.plain)
     }
 
     private var collectionContent: some View {
@@ -290,16 +316,22 @@ struct AppShellView: View {
             VStack(spacing: 14) {
                 HStack {
                     Image(systemName: "magnifyingglass").foregroundStyle(MediaPalette.muted)
-                    TextField("Search books, music, video…", text: $searchText).textInputAutocapitalization(.never)
+                    TextField("Search all media…", text: $searchText).textInputAutocapitalization(.never)
                 }
                 .padding(13).background(MediaPalette.surface, in: RoundedRectangle(cornerRadius: 13))
                 ScrollView {
                     LazyVStack(spacing: 9) {
                         ForEach(searchResults, id: \.id) { item in MediaRow(item: item) { open(item); showingSearch = false } }
+                        ForEach(serverSearchResults) { item in
+                            JellyfinEntryRow(item: item) {
+                                showingSearch = false
+                                showingJellyfinLibrary = true
+                            }
+                        }
                     }
                 }
                 if searchText.isEmpty {
-                    Text("Search imported media here. Jellyfin results will join when the server provider is connected.")
+                    Text(jellyfin.isConnected ? "Search your local and Jellyfin libraries." : "Search imported media here, or connect a Jellyfin server in Settings.")
                         .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted).frame(maxWidth: .infinity, alignment: .leading)
                 }
                 Spacer(minLength: 0)
@@ -317,6 +349,14 @@ struct AppShellView: View {
         return items.filter {
             let haystack = "\($0.title) \($0.creator) \($0.collection) \($0.kind.title)".folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
             return haystack.contains(query)
+        }
+    }
+
+    private var serverSearchResults: [JellyfinLibraryEntry] {
+        guard jellyfin.isConnected, !searchText.isEmpty else { return [] }
+        let query = searchText.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        return jellyfin.entries.filter {
+            "\($0.title) \($0.creator) \($0.kind.title)".folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current).contains(query)
         }
     }
 
@@ -463,13 +503,59 @@ private struct NowPlayingSheet: View {
 }
 
 private struct SettingsSheet: View {
+    @Environment(JellyfinProvider.self) private var jellyfin
+
     var body: some View {
         NavigationStack {
             List {
                 Section("Library") {
                     Label("Local files", systemImage: "folder")
-                    Label("Jellyfin server", systemImage: "server.rack")
-                    Text("Server sign-in and discovery are the next integration phase.").font(.caption).foregroundStyle(.secondary)
+                }
+                Section("Jellyfin server") {
+                    if jellyfin.isConnected {
+                        Label(jellyfin.connectedServerName ?? "Connected", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        Text("\(jellyfin.entries.count) music, video, and book items loaded")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text("Server catalog browsing and unified search are connected. Remote playback and server progress reporting remain future work.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Button {
+                            Task { await jellyfin.refreshLibrary() }
+                        } label: {
+                            Label(jellyfin.isLoading ? "Refreshing…" : "Refresh library", systemImage: "arrow.clockwise")
+                        }
+                        .disabled(jellyfin.isLoading)
+                        Button("Disconnect server", role: .destructive) {
+                            Task { await jellyfin.disconnect() }
+                        }
+                    } else {
+                        TextField("https://your-jellyfin-server", text: Binding(
+                            get: { jellyfin.serverAddress },
+                            set: { jellyfin.serverAddress = $0 }
+                        ))
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.URL)
+                        .autocorrectionDisabled()
+                        TextField("Username", text: Binding(
+                            get: { jellyfin.username },
+                            set: { jellyfin.username = $0 }
+                        ))
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        SecureField("Password", text: Binding(
+                            get: { jellyfin.password },
+                            set: { jellyfin.password = $0 }
+                        ))
+                        Button {
+                            Task { await jellyfin.connect() }
+                        } label: {
+                            Label(jellyfin.isLoading ? "Connecting…" : "Connect to Jellyfin", systemImage: "server.rack")
+                        }
+                        .disabled(jellyfin.isLoading)
+                    }
+                    if let error = jellyfin.errorMessage {
+                        Text(error).font(.caption).foregroundStyle(.red)
+                    }
                 }
                 Section("Playback") {
                     Label("Music and video currently use Apple AVPlayer.", systemImage: "play.circle")
@@ -485,5 +571,103 @@ private struct SettingsSheet: View {
             .navigationTitle("Settings").navigationBarTitleDisplayMode(.inline)
         }
         .preferredColorScheme(.dark).presentationDetents([.medium, .large])
+    }
+}
+
+private struct JellyfinLibrarySheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(JellyfinProvider.self) private var jellyfin
+    @State private var filter = "all"
+
+    private var visibleItems: [JellyfinLibraryEntry] {
+        guard filter != "all" else { return jellyfin.entries }
+        return jellyfin.entries.filter { $0.kind.rawValue == filter }
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 12) {
+                Picker("Media type", selection: $filter) {
+                    Text("All").tag("all")
+                    Text("Music").tag(MediaKind.music.rawValue)
+                    Text("Video").tag(MediaKind.video.rawValue)
+                    Text("Books").tag(MediaKind.book.rawValue)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+
+                if jellyfin.isLoading && jellyfin.entries.isEmpty {
+                    ProgressView("Loading server library…").tint(MediaPalette.accent).frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if visibleItems.isEmpty {
+                    ContentUnavailableView("No matching server items", systemImage: "server.rack", description: Text("Try another media filter or refresh the Jellyfin library."))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 9) {
+                            ForEach(visibleItems) { item in JellyfinEntryRow(item: item) }
+                        }
+                        .padding(.horizontal, 16)
+                    }
+                }
+            }
+            .padding(.top, 12)
+            .background(MediaPalette.background)
+            .navigationTitle(jellyfin.connectedServerName ?? "Jellyfin")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { Task { await jellyfin.refreshLibrary() } } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .disabled(jellyfin.isLoading)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if let error = jellyfin.errorMessage {
+                    Text(error).font(.caption).foregroundStyle(.white)
+                        .padding(12).frame(maxWidth: .infinity).background(.red.opacity(0.85))
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
+private struct JellyfinEntryRow: View {
+    let item: JellyfinLibraryEntry
+    var action: (() -> Void)? = nil
+
+    var body: some View {
+        if let action {
+            Button(action: action) { rowContent }
+                .buttonStyle(.plain)
+        } else {
+            rowContent
+        }
+    }
+
+    private var rowContent: some View {
+            HStack(spacing: 12) {
+                AsyncImage(url: item.imageURL) { phase in
+                    if let image = phase.image {
+                        image.resizable().scaledToFill()
+                    } else {
+                        RoundedRectangle(cornerRadius: 12).fill(MediaPalette.accent.opacity(0.14))
+                            .overlay(Image(systemName: item.kind.symbol).foregroundStyle(MediaPalette.accent))
+                    }
+                }
+                .frame(width: 52, height: 52).clipShape(RoundedRectangle(cornerRadius: 12))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.title).font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1)
+                    Text([item.creator, item.kind.title, "Jellyfin"].filter { !$0.isEmpty }.joined(separator: " · "))
+                        .font(.system(size: 10, design: .rounded)).foregroundStyle(MediaPalette.muted).lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "server.rack").font(.system(size: 11)).foregroundStyle(MediaPalette.muted)
+            }
+            .padding(9).background(MediaPalette.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 15))
     }
 }

@@ -9,6 +9,9 @@ settings:
     SWIFT_VERSION: "6.0"
     IPHONEOS_DEPLOYMENT_TARGET: "18.0"
 packages:
+  Jellyfin:
+    url: https://github.com/jellyfin/jellyfin-sdk-swift.git
+    revision: e69dd0358ad33148aded867661e27d71de29d0c3
   Readium:
     url: https://github.com/readium/swift-toolkit.git
     revision: e20d5cfc847c2cfa02aaf7be409848b504bd46ca
@@ -23,8 +26,11 @@ targets:
     resources:
       - Sources/Resources/Fonts/Fast_Serif.ttf
       - Sources/Resources/ThirdPartyLicenses/Fast-Font-MIT.txt
+      - Sources/Resources/ThirdPartyLicenses/Jellyfin-Swift-SDK-MPL-2.0.txt
       - Sources/Resources/ThirdPartyLicenses/Readium-BSD-3-Clause.txt
     dependencies:
+      - package: Jellyfin
+        product: JellyfinAPI
       - package: Readium
         product: ReadiumShared
       - package: Readium

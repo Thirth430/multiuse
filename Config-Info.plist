@@ -24,6 +24,13 @@
     <true/>
     <key>LSRequiresIPhoneOS</key>
     <true/>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Unified Media connects to the Jellyfin server address you provide to browse your personal media library.</string>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
     <key>UIAppFonts</key>
     <array>
         <string>Fast_Serif.ttf</string>
