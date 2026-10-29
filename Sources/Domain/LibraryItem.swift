@@ -36,6 +36,7 @@ final class MediaLibraryRecord {
     var collection: String
     var fileName: String
     var fileExtension: String
+    var artworkFileName: String?
     var addedAt: Date
     var lastOpenedAt: Date?
     var progressSeconds: Double
@@ -55,6 +56,7 @@ final class MediaLibraryRecord {
         collection: String = "",
         fileName: String,
         fileExtension: String,
+        artworkFileName: String? = nil,
         addedAt: Date = .now
     ) {
         self.id = id
@@ -66,6 +68,7 @@ final class MediaLibraryRecord {
         self.collection = collection
         self.fileName = fileName
         self.fileExtension = fileExtension.lowercased()
+        self.artworkFileName = artworkFileName
         self.addedAt = addedAt
         self.progressSeconds = 0
         self.durationSeconds = 0
@@ -79,6 +82,12 @@ final class MediaLibraryRecord {
     }
 
     var localURL: URL { Self.importDirectory.appendingPathComponent(fileName) }
+    var artworkURL: URL? {
+        guard let artworkFileName else { return nil }
+        return Self.importDirectory
+            .appendingPathComponent("Artwork", isDirectory: true)
+            .appendingPathComponent(artworkFileName)
+    }
 
     static var importDirectory: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]

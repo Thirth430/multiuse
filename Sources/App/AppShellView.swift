@@ -2,6 +2,7 @@ import AVKit
 import Combine
 import SwiftData
 import SwiftUI
+import UIKit
 
 private enum AppSection: String, CaseIterable, Identifiable {
     case home, music, video, book, game
@@ -70,7 +71,9 @@ struct AppShellView: View {
         .sheet(isPresented: $showingDetail) {
             if let selectedItem {
                 MediaDetailSheet(item: selectedItem) {
-                    playback.play(selectedItem)
+                    let queue = items.filter { $0.kind == selectedItem.kind }
+                    let index = queue.firstIndex(where: { $0.id == selectedItem.id }) ?? 0
+                    playback.play(selectedItem, queue: queue, startIndex: index)
                     showingDetail = false
                     showingPlayer = true
                 }
@@ -257,7 +260,7 @@ struct AppShellView: View {
     private func recentCard(_ item: MediaLibraryRecord) -> some View {
         Button { open(item) } label: {
             HStack(spacing: 13) {
-                MediaArtwork(kind: item.kind, size: 52)
+                MediaArtwork(kind: item.kind, size: 52, artworkURL: item.artworkURL)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("PICK UP WHERE YOU LEFT OFF").font(.system(size: 8, weight: .bold, design: .rounded)).tracking(0.8).foregroundStyle(MediaPalette.accent)
                     Text(item.title).font(.system(size: 14, weight: .bold, design: .rounded)).foregroundStyle(.white).lineLimit(1)
@@ -274,7 +277,7 @@ struct AppShellView: View {
     private var miniPlayer: some View {
         HStack(spacing: 11) {
             if let item = playback.currentItem {
-                MediaArtwork(kind: item.kind, size: 39)
+                MediaArtwork(kind: item.kind, size: 39, artworkURL: item.artworkURL)
                 Button { showingPlayer = true } label: {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(item.title).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1)
@@ -380,7 +383,7 @@ private struct MediaRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                MediaArtwork(kind: item.kind, size: 48)
+                MediaArtwork(kind: item.kind, size: 48, artworkURL: item.artworkURL)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(item.title).font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1)
                     Text([item.creator, item.kind.title, item.origin].filter { !$0.isEmpty }.joined(separator: " · "))
@@ -399,10 +402,24 @@ private struct MediaRow: View {
 private struct MediaArtwork: View {
     let kind: MediaKind
     let size: CGFloat
+    var artworkURL: URL? = nil
+    @State private var image: UIImage?
+
     var body: some View {
         RoundedRectangle(cornerRadius: 12).fill(MediaPalette.accent.opacity(0.15))
-            .overlay(Image(systemName: kind.symbol).font(.system(size: size * 0.34, weight: .medium)).foregroundStyle(MediaPalette.accent))
+            .overlay {
+                if let image {
+                    Image(uiImage: image).resizable().scaledToFill().frame(width: size, height: size).clipShape(RoundedRectangle(cornerRadius: 12))
+                } else {
+                    Image(systemName: kind.symbol).font(.system(size: size * 0.34, weight: .medium)).foregroundStyle(MediaPalette.accent)
+                }
+            }
             .frame(width: size, height: size)
+            .task(id: artworkURL) {
+                guard let artworkURL else { image = nil; return }
+                let data = await Task.detached(priority: .utility) { try? Data(contentsOf: artworkURL) }.value
+                image = data.flatMap(UIImage.init(data:))
+            }
     }
 }
 
@@ -416,7 +433,7 @@ private struct MediaDetailSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 17) {
             HStack { Spacer(); Button { dismiss() } label: { Image(systemName: "xmark").font(.system(size: 12, weight: .bold)).foregroundStyle(MediaPalette.muted).padding(10).background(MediaPalette.surface, in: Circle()) } }
-            MediaArtwork(kind: item.kind, size: 92).frame(maxWidth: .infinity)
+            MediaArtwork(kind: item.kind, size: 92, artworkURL: item.artworkURL).frame(maxWidth: .infinity)
             Text(item.title).font(.system(size: 24, weight: .bold, design: .rounded)).foregroundStyle(.white)
             Text("\(item.kind.title) · \(item.fileExtension.uppercased()) · \(item.origin)")
                 .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
@@ -471,7 +488,7 @@ private struct NowPlayingSheet: View {
             }
             if let item = playback.currentItem {
                 if item.kind == .video { VideoPlayer(player: playback.player).frame(height: 230).clipShape(RoundedRectangle(cornerRadius: 18)) }
-                else { MediaArtwork(kind: item.kind, size: 180).frame(maxWidth: .infinity).padding(.vertical, 13) }
+                else { MediaArtwork(kind: item.kind, size: 180, artworkURL: item.artworkURL).frame(maxWidth: .infinity).padding(.vertical, 13) }
                 VStack(alignment: .leading, spacing: 5) {
                     Text(item.title).font(.system(size: 21, weight: .bold, design: .rounded)).foregroundStyle(.white).lineLimit(2)
                     Text(item.creator.isEmpty ? "\(item.kind.title) · \(item.origin == "Jellyfin" ? "Jellyfin server" : "Local library")" : item.creator)
@@ -481,12 +498,14 @@ private struct NowPlayingSheet: View {
                 HStack { Text(timeLabel(playback.elapsedSeconds)); Spacer(); Text(timeLabel(playback.durationSeconds)) }
                     .font(.system(size: 10, design: .rounded)).foregroundStyle(MediaPalette.muted)
                 HStack(spacing: 38) {
+                    Button { playback.playPrevious() } label: { Image(systemName: "backward.end.fill") }
                     Button { playback.seek(to: max(0, playback.elapsedSeconds - 15)) } label: { Image(systemName: "gobackward.15") }
                     Button { playback.togglePlayback() } label: {
                         Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 21, weight: .bold))
                             .foregroundStyle(MediaPalette.background).frame(width: 60, height: 60).background(MediaPalette.accent, in: Circle())
                     }
                     Button { playback.seek(to: playback.elapsedSeconds + 15) } label: { Image(systemName: "goforward.15") }
+                    Button { playback.playNext() } label: { Image(systemName: "forward.end.fill") }
                 }
                 .font(.system(size: 20, weight: .medium)).foregroundStyle(.white)
                 if let error = playback.errorMessage { Text(error).font(.system(size: 12, design: .rounded)).foregroundStyle(.orange) }

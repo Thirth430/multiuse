@@ -46,12 +46,33 @@ enum LocalMediaImporter {
                     try FileManager.default.copyItem(at: sourceURL, to: URL(fileURLWithPath: destinationPath))
                 }.value
 
-                context.insert(MediaLibraryRecord(
+                var title = sourceURL.deletingPathExtension().lastPathComponent
+                var creator = ""
+                var collection = ""
+                var duration = 0.0
+                var artworkFileName: String?
+                if kind == .music {
+                    let metadata = await LocalMusicMetadataLoader.loadAudio(at: URL(fileURLWithPath: destinationPath))
+                    title = metadata.title
+                    creator = metadata.artist
+                    collection = metadata.album
+                    duration = metadata.duration
+                    if let artworkData = metadata.artworkData {
+                        artworkFileName = await MediaArtworkStore.save(artworkData)
+                    }
+                }
+
+                let record = MediaLibraryRecord(
                     kind: kind,
-                    title: sourceURL.deletingPathExtension().lastPathComponent,
+                    title: title,
+                    creator: creator,
+                    collection: collection,
                     fileName: destinationName,
-                    fileExtension: extensionName
-                ))
+                    fileExtension: extensionName,
+                    artworkFileName: artworkFileName
+                )
+                record.durationSeconds = duration
+                context.insert(record)
                 summary.importedCount += 1
             } catch {
                 summary.failures.append("\(sourceURL.lastPathComponent): \(error.localizedDescription)")
@@ -68,7 +89,7 @@ enum LocalMediaImporter {
 
     private static func mediaKind(for pathExtension: String) -> MediaKind? {
         switch pathExtension.lowercased() {
-        case "mp3", "m4a", "aac", "wav", "aif", "aiff", "caf": .music
+        case "mp3", "m4a", "aac", "wav", "aif", "aiff", "flac", "caf", "opus": .music
         case "mp4", "m4v", "mov": .video
         case "epub", "cbz": .book
         default: nil

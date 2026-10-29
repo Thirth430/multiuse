@@ -13,7 +13,9 @@
 - [x] Add local search, favorites, recents, and per-category empty states.
 - [x] Add AVPlayer-based local audio/video controls and progress checkpoints.
 - [x] Add a manually triggered GitHub Actions workflow and first importer unit tests.
-- [ ] Adapt LocalMusic queue, metadata/artwork, remote commands, and interruption handling.
+- [x] Adapt LocalMusic metadata tags and embedded artwork into shared records and artwork rendering; extend import recognition to FLAC and Opus.
+- [x] Add a shared playback queue, previous/next controls, lock-screen/remote commands, now-playing metadata, audio interruption handling, and headphone-removal pause behavior.
+- [ ] Verify music tags/artwork, queue progression, background controls, interruptions, and supported formats on the GitHub iOS runner/device.
 - [ ] Verify import/play/resume/unavailable-file behavior on an iOS device or simulator.
 
 ## Phase 3 — Readium and typography
