@@ -14,12 +14,22 @@ struct ImportedAudioMetadata: Sendable {
 /// while keeping the unified library's own catalog model and interface.
 enum LocalMusicMetadataLoader {
     static func loadAudio(at url: URL) async -> ImportedAudioMetadata {
-        let asset = AVURLAsset(url: url)
         var title = url.deletingPathExtension().lastPathComponent
         var artist = "Unknown Artist"
         var album = "Unknown Album"
         var duration = 0.0
         var artworkData: Data?
+
+        // Avoid asking AVFoundation to inspect empty or truncated files. The
+        // importer preserves the previous filename fallback for these files;
+        // playback can report the decode error when the user opens them.
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        let fileSize = (attributes?[.size] as? NSNumber)?.intValue ?? 0
+        guard fileSize >= 16 else {
+            return ImportedAudioMetadata(title: title, artist: artist, album: album, duration: duration, artworkData: nil)
+        }
+
+        let asset = AVURLAsset(url: url)
 
         if let time = try? await asset.load(.duration) {
             let seconds = CMTimeGetSeconds(time)
