@@ -1164,7 +1164,7 @@ private struct JellyfinEntryDetailSheet: View {
                     if !item.overview.isEmpty {
                         Text(item.overview).font(.system(size: 14, design: .rounded)).foregroundStyle(.white.opacity(0.84))
                     }
-                    if item.isAlbum {
+                    if item.isAlbum || item.isPlaylist {
                         VStack(alignment: .leading, spacing: 9) {
                             Text("Tracks").font(.system(size: 16, weight: .bold, design: .rounded)).foregroundStyle(.white)
                             if isLoadingAlbumTracks {
@@ -1172,7 +1172,8 @@ private struct JellyfinEntryDetailSheet: View {
                             } else if let albumTracksError {
                                 Text(albumTracksError).font(.system(size: 12, design: .rounded)).foregroundStyle(.red)
                             } else if albumTracks.isEmpty {
-                                Text("This album has no available tracks.").font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
+                                Text(item.isPlaylist ? "This playlist has no available tracks." : "This album has no available tracks.")
+                                    .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
                             } else {
                                 ForEach(albumTracks) { track in
                                     HStack(spacing: 10) {
@@ -1281,8 +1282,8 @@ private struct JellyfinEntryDetailSheet: View {
                         .disabled(isStartingPlayback)
                     } else {
                         Label(
-                            item.isAlbum ? "Choose a track above to play" : item.isArtist ? "Choose an album above to browse tracks" : item.kind == .book ? "Server books are browse-only here" : "This server item can’t be played here",
-                            systemImage: item.isAlbum ? "music.note.list" : item.isArtist ? "music.mic" : "info.circle"
+                            item.isAlbum || item.isPlaylist ? "Choose a track above to play" : item.isArtist ? "Choose an album above to browse tracks" : item.kind == .book ? "Server books are browse-only here" : "This server item can’t be played here",
+                            systemImage: item.isAlbum || item.isPlaylist ? "music.note.list" : item.isArtist ? "music.mic" : "info.circle"
                         )
                             .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
                             .padding(13).frame(maxWidth: .infinity, alignment: .leading).background(MediaPalette.surface, in: RoundedRectangle(cornerRadius: 14))
@@ -1308,7 +1309,7 @@ private struct JellyfinEntryDetailSheet: View {
             }
         }
         .task(id: item.id) {
-            if item.isAlbum {
+            if item.isAlbum || item.isPlaylist {
                 isLoadingAlbumTracks = true
                 albumTracksError = nil
                 defer { isLoadingAlbumTracks = false }

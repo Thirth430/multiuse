@@ -45,11 +45,13 @@
 - [x] Add Jellyfin-backed favorite state and toggle actions in server item details; show favorite markers in server browse rows.
 - [x] Browse tracks within Jellyfin music albums and start a selected server track from the album detail.
 - [x] Include Jellyfin music artists in the server catalog and browse each artist's albums before opening album tracks.
+- [x] Include Jellyfin playlists in the server catalog and browse playlist tracks with individual playback actions.
 - [x] Open Jellyfin search results in an in-app detail view with direct playback for playable items and a clear browse-only state for server books.
 - [x] Wire Jellyfin playback-info/stream URLs into the shared AVPlayer and report server playback start, periodic progress, stop, and resume position.
 - [ ] Verify package resolution, authentication, artwork, paginated loading, and network failures with a live Jellyfin server on the GitHub runner/device; revisit a newer SDK pin after upstream compiler compatibility is confirmed.
 - [ ] Verify Jellyfin album track listing and selected-track playback against a live server.
 - [ ] Verify Jellyfin artist album browsing against a live server.
+- [ ] Verify Jellyfin playlist item loading and selected-track playback against a live server.
 - [ ] Verify remote audio/video streaming, resume seeking, and Jellyfin session progress/stopped reporting against a live server; subtitle selection and server-side transcoding profile negotiation remain unimplemented.
 
 ## Phase 5 — Video engine decision
@@ -81,4 +83,4 @@
 
 ## Verification policy
 
-This project is being edited on Windows without Xcode or iOS Simulator. The user confirmed the GitHub iOS checkpoint passed on commit `936f09a8090fee1a2d31c72339f478c5842e2372`, including the full-screen video player, then confirmed later checkpoints for Jellyfin pagination (`ca55c2e`) and Jellyfin album track browsing (current checkout `f682068`). Local and live-server verification details are still listed separately below. Live game playback still needs a JellyEmu-enabled server and simulator/device verification. Device playback, artwork extraction, reader presentation, video track selection, game UI, and other live Jellyfin behavior also remain runtime checks.
+This project is being edited on Windows without Xcode or iOS Simulator. The user confirmed the GitHub iOS checkpoint passed on commit `936f09a8090fee1a2d31c72339f478c5842e2372`, including the full-screen video player, then confirmed later checkpoints for Jellyfin pagination (`ca55c2e`), album track browsing (`f682068`), and artist album browsing (current checkout `5d40a98`). Local and live-server verification details are still listed separately below. Live game playback still needs a JellyEmu-enabled server and simulator/device verification. Device playback, artwork extraction, reader presentation, video track selection, game UI, and other live Jellyfin behavior also remain runtime checks.
