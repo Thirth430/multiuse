@@ -18,7 +18,8 @@
 - [x] Add persistent local music playlists with create/edit/delete, reorderable track membership, playlist browsing, and playlist queue playback.
 - [x] Add grouped album and artist browsing with detail lists and queue playback.
 - [x] Add a playlist persistence unit test for ordered track IDs.
-- [ ] Verify playlist persistence, edits, deleted or unavailable tracks, and playlist queue progression on the GitHub iOS runner/device.
+- [x] Verify playlist ordered-ID persistence with the new GitHub iOS unit test (checkpoint run #20 passed).
+- [ ] Verify playlist editing, unavailable tracks, and playback progression on an iOS simulator/device.
 - [ ] Verify album and artist grouping/detail playback on the GitHub iOS runner/device.
 - [ ] Verify music tags/artwork, queue progression, background controls, interruptions, and supported formats on the GitHub iOS runner/device.
 - [ ] Verify import/play/resume/unavailable-file behavior on an iOS device or simulator.
@@ -56,11 +57,12 @@
 
 - [x] Import local game files for the listed cartridge and disc image extensions, identify the associated system, and use shared favorites/search/catalog details.
 - [x] Clearly mark game launch unavailable until a suitable licensed and iOS-compatible core runtime is linked.
-- [ ] Verify local game-file import, system classification, and favorites on the GitHub iOS runner/device.
+- [x] Verify local game-file import and system classification with the GitHub iOS unit test (checkpoint run #20 passed).
+- [ ] Verify game browsing and favorites on an iOS simulator/device.
 - [ ] Select a Libretro boundary and audit each proposed core's license and iOS build.
 - [ ] Implement controller mapping, save paths, favorites, and game metadata without bundling copyrighted game content.
 - [ ] Prototype the cross-media 2D collection experience after core media paths are usable.
 
 ## Verification policy
 
-This project is being edited on Windows without Xcode or iOS Simulator. No iOS build or simulator test has been claimed for the new remote playback wiring. The checkpoint workflow is `.github/workflows/ios-checkpoint.yml`, and this project has an `origin` remote. After the changes are committed and pushed, the user should run the workflow and share its result before platform-specific fixes are treated as verified. Live-server behavior also needs a real Jellyfin server account and network test.
+This project is being edited on Windows without Xcode or iOS Simulator. GitHub iOS checkpoint run #20 passed on commit `5f117ee8cd259d33b64ac15eac7af86e0e6bed8e`, including the playlist persistence and game import/system-classification unit tests. Device playback, artwork extraction, reader presentation, video track selection, game UI, and live Jellyfin behavior still need runtime verification. Live-server testing also requires a real Jellyfin server account and network access.
