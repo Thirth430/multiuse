@@ -212,7 +212,7 @@ struct ReadiumBookReader: View {
     private var contentsSheet: some View {
         NavigationStack {
             List(Array(session.tableOfContents.enumerated()), id: \.offset) { _, link in
-                Button(link.title ?? link.href.string) {
+                Button(link.title ?? link.href) {
                     Task { _ = await navigator?.go(to: link); showingContents = false }
                 }
                 .foregroundStyle(.primary)
@@ -314,7 +314,7 @@ private struct CBZComicReader: View {
             didRestoreLocation = true
             if let initialLocation { restore(initialLocation) }
         }
-        .onChange(of: navigationRequest?.href.string) { _, _ in
+        .onChange(of: navigationRequest?.href.url.absoluteString) { _, _ in
             if let navigationRequest { restore(navigationRequest) }
         }
         .task(id: pageIndex) { await loadCurrentPage() }
@@ -339,7 +339,7 @@ private struct CBZComicReader: View {
                 href: pages[pageIndex].url(),
                 mediaType: mediaType,
                 title: pages[pageIndex].title,
-                locations: .init(position: pageIndex + 1, totalProgression: progression)
+                locations: .init(totalProgression: progression, position: pageIndex + 1)
             )
             item.readingLocatorJSON = try? locator.jsonString()
             item.readingProgression = progression
@@ -351,7 +351,7 @@ private struct CBZComicReader: View {
     }
 
     private func restore(_ locator: Locator) {
-        if let index = pages.firstIndex(where: { $0.url().string == locator.href.string }) {
+        if let index = pages.firstIndex(where: { $0.url().url.absoluteString == locator.href.url.absoluteString }) {
             pageIndex = index
         }
     }
