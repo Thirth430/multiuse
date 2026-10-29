@@ -8,12 +8,29 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+packages:
+  Readium:
+    url: https://github.com/readium/swift-toolkit.git
+    revision: e20d5cfc847c2cfa02aaf7be409848b504bd46ca
 targets:
   UnifiedMedia:
     type: application
     platform: iOS
     sources:
-      - Sources
+      - path: Sources
+        excludes:
+          - Resources/**
+    resources:
+      - Sources/Resources/Fonts/Fast_Serif.ttf
+      - Sources/Resources/ThirdPartyLicenses/Fast-Font-MIT.txt
+      - Sources/Resources/ThirdPartyLicenses/Readium-BSD-3-Clause.txt
+    dependencies:
+      - package: Readium
+        product: ReadiumShared
+      - package: Readium
+        product: ReadiumStreamer
+      - package: Readium
+        product: ReadiumNavigator
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.unifiedmedia.ios

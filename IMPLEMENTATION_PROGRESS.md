@@ -18,10 +18,12 @@
 
 ## Phase 3 — Readium and typography
 
-- [ ] Add Readium through modular Swift package products.
-- [ ] Integrate EPUB navigation, locator persistence, bookmarks, and reading preferences.
-- [ ] Integrate CBZ browsing; retain the verified CBR limitation unless a separate implementation is selected.
-- [ ] Add Fast-Font faces after checking font asset redistribution rights.
+- [x] Add Readium Shared, Streamer, and Navigator from the checked-out revision through a pinned Swift package dependency.
+- [x] Add Readium EPUB navigation, saved locators, bookmarks, table of contents, and font-size controls.
+- [x] Add CBZ parsing with an app-owned page navigator over Readium's image resources (no CBZ navigator implementation exists in the checked-out source), including saved-page restoration and bookmark navigation.
+- [x] Include the MIT-licensed Fast Serif face as an optional reader font.
+- [ ] Verify EPUB/CBZ rendering, restored positions, bookmarks, and font injection on the GitHub iOS simulator.
+- [ ] Retain the verified CBR limitation unless a separate implementation is selected.
 
 ## Phase 4 — Jellyfin server provider
 
@@ -43,4 +45,4 @@
 
 ## Verification policy
 
-This project is being edited on Windows without Xcode or iOS Simulator. No iOS build or simulator test has been claimed. The first checkpoint tests are in `.github/workflows/ios-checkpoint.yml`; the nested project repository currently has no GitHub remote, so it must be pushed to a GitHub repository before the workflow can run. The user will run that workflow and share its result before platform-specific fixes are treated as verified.
+This project is being edited on Windows without Xcode or iOS Simulator. No iOS build or simulator test has been claimed. The checkpoint workflow is `.github/workflows/ios-checkpoint.yml`, and this project has an `origin` remote. After the Readium changes are committed and pushed, the user should run the workflow and share its result before platform-specific fixes are treated as verified.

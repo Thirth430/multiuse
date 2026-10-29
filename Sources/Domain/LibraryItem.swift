@@ -40,6 +40,9 @@ final class MediaLibraryRecord {
     var lastOpenedAt: Date?
     var progressSeconds: Double
     var durationSeconds: Double
+    var readingLocatorJSON: String?
+    var readingProgression: Double
+    var readingBookmarksData: Data?
     var isFavorite: Bool
 
     init(
@@ -66,6 +69,7 @@ final class MediaLibraryRecord {
         self.addedAt = addedAt
         self.progressSeconds = 0
         self.durationSeconds = 0
+        self.readingProgression = 0
         self.isFavorite = false
     }
 

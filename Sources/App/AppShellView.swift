@@ -205,7 +205,7 @@ struct AppShellView: View {
         switch kind {
         case .music: "Import audio files to build your local music library."
         case .video: "Import MP4, M4V, or MOV files to watch them here."
-        case .book: "EPUB and CBZ import is available. Readium reading is the next integration step. CBR is not supported by the inspected Readium source."
+        case .book: "Open EPUB books and CBZ comics with Readium. CBR is not supported by the inspected Readium source."
         case .game: "The game catalog and emulator runtime are not connected yet."
         case nil: "Import local media or connect a server from Settings."
         }
@@ -369,6 +369,7 @@ private struct MediaArtwork: View {
 private struct MediaDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @State private var showingReader = false
     let item: MediaLibraryRecord
     let play: () -> Void
 
@@ -385,8 +386,12 @@ private struct MediaDetailSheet: View {
                         .foregroundStyle(MediaPalette.background).frame(maxWidth: .infinity).padding(14).background(MediaPalette.accent, in: Capsule())
                 }
             } else if item.kind == .book {
-                Text(item.fileExtension == "cbz" ? "CBZ imported · comic reader connection is next." : "EPUB imported · Readium reader connection is next.")
-                    .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
+                Button { showingReader = true } label: {
+                    Label(item.fileExtension == "cbz" ? "Read comic" : "Read book", systemImage: "book.open.fill")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(MediaPalette.background)
+                        .frame(maxWidth: .infinity).padding(14).background(MediaPalette.accent, in: Capsule())
+                }
             }
             HStack {
                 Button { item.isFavorite.toggle(); try? modelContext.save() } label: {
@@ -406,6 +411,10 @@ private struct MediaDetailSheet: View {
         }
         .padding(22).background(MediaPalette.background.ignoresSafeArea())
         .presentationDetents([.medium, .large]).preferredColorScheme(.dark)
+        .sheet(isPresented: $showingReader) {
+            ReadiumBookReader(item: item)
+                .preferredColorScheme(.light)
+        }
     }
 }
 
@@ -467,7 +476,8 @@ private struct SettingsSheet: View {
                     Text("Format coverage, background behavior, subtitle selection, and remote controls need device verification.").font(.caption).foregroundStyle(.secondary)
                 }
                 Section("Reading and games") {
-                    Label("Readium and the game runtime are not connected yet.", systemImage: "book.closed")
+                    Label("EPUB and CBZ reading use Readium. Game runtime is not connected yet.", systemImage: "book.closed")
+                    Text("The Fast Serif reading option is included from Fast-Font.").font(.caption).foregroundStyle(.secondary)
                     Text("EPUB and CBZ can be imported. CBR is not supported by the inspected Readium source.").font(.caption).foregroundStyle(.secondary)
                 }
             }
