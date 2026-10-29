@@ -28,6 +28,12 @@ This assessment is based on package manifests, app configuration, source entry p
 
 ## Compatibility and dependency plan
 
+### Added JellyEmu repository assessment
+
+The added `JellyEmu` checkout is an MIT-licensed Jellyfin server plugin written in C# for .NET 9 and Jellyfin 10.11; it is not an iOS framework. Its controllers expose Jellyfin game items as `Book` items tagged `JellyEmu`, a `/jellyemu/play/{itemId}` EmulatorJS page, ROM streaming, per-user saves and session endpoints, and RetroArch playlist/launch endpoints. The app keeps that plugin server-side, classifies the tagged items as games, and opens the plugin player in a native `WKWebView` with the auth-token hook its page expects. This is an interoperability integration, not an embedded RetroArch or core runtime.
+
+The iOS RetroArch URI handler is designed around locally addressable content; the JellyEmu playlist's remote ROM stream URLs do not establish a working iOS launch path. The plugin-hosted web runtime is therefore the immediate option. Its WebKit compatibility, gamepad behavior, startup headers, auth/API requests, and save/exit behavior are unverified until run against a real plugin-enabled server. JellyEmu's root MIT license does not cover independently bundled or remotely fetched emulator assets/cores; review those licenses and provenance before distribution.
+
 The strictest checked-in toolchain requirement is Readium's Swift 6.2 package; LocalMusic uses Swift 6 and iOS 18, Jellyfin uses Swift 6 and iOS 16, while Readium and MPVKit declare iOS 15. A practical first target is iOS 18 with a current Xcode toolchain, then lowering the target only after the LocalMusic APIs and all transitive dependencies compile at that deployment version. Keep dependencies modular and do not add the GPL products by default. Pin package versions/revisions and commit the resolved dependency graph before release.
 
 The workspace runs on Windows, so Xcode, iOS Simulator, device signing, and iOS runtime verification are unavailable here. A successful iOS build or working playback must not be claimed until checked on macOS with Xcode and a device/simulator.

@@ -63,9 +63,13 @@
 - [x] Verify local game-file import and system classification with the GitHub iOS unit test (checkpoint run #20 passed).
 - [ ] Verify game browsing and favorites on an iOS simulator/device.
 - [ ] Select a Libretro boundary and audit each proposed core's license and iOS build.
+- [x] Inspect the added JellyEmu source: it is a .NET 9/Jellyfin server plugin, not a linkable iOS emulator. Confirm its Jellyfin book/tag catalog convention, web player route, ROM streaming, saves, sessions, and RetroArch playlist API.
+- [x] Classify JellyEmu-tagged Jellyfin book items as games, expose the game system tag and Games filter, and connect game details to the plugin's `/jellyemu/play/{itemId}` route in a native-hosted WKWebView with its expected token hook.
+- [ ] Verify plugin compatibility, player loading, touch/gamepad controls, save-state behavior, and exit/session handling on a supported iOS simulator/device with a live server; this integration is currently unverified.
+- [ ] Audit EmulatorJS and emulator core licenses/provenance independently from JellyEmu's MIT license.
 - [ ] Implement controller mapping, save paths, favorites, and game metadata without bundling copyrighted game content.
 - [ ] Prototype the cross-media 2D collection experience after core media paths are usable.
 
 ## Verification policy
 
-This project is being edited on Windows without Xcode or iOS Simulator. GitHub iOS checkpoint run #20 passed on commit `5f117ee8cd259d33b64ac15eac7af86e0e6bed8e`, including the playlist persistence and game import/system-classification unit tests. Device playback, artwork extraction, reader presentation, video track selection, game UI, and live Jellyfin behavior still need runtime verification. Live-server testing also requires a real Jellyfin server account and network access.
+This project is being edited on Windows without Xcode or iOS Simulator. GitHub iOS checkpoint run #23 passed on commit `086aaa3f013ef9755d8516f18f685ab21898a1af`. JellyEmu catalog and WKWebView changes are newer and have not been built or tested. Device playback, artwork extraction, reader presentation, video track selection, game UI, and live Jellyfin/JellyEmu behavior still need runtime verification. Live-server testing requires a Jellyfin server with JellyEmu installed and accessible.

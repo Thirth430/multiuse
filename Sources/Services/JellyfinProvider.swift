@@ -9,11 +9,19 @@ struct JellyfinLibraryEntry: Identifiable, Equatable {
     let title: String
     let creator: String
     let kind: MediaKind
+    let gameSystem: String?
     let overview: String
     let durationSeconds: Double
     let resumeSeconds: Double
     let isPlayable: Bool
     let imageURL: URL?
+}
+
+struct JellyEmuGameConfiguration: Sendable {
+    let itemID: String
+    let userID: String
+    let accessToken: String
+    let playURL: URL
 }
 
 struct JellyfinPlaybackSession: Sendable {
@@ -107,6 +115,7 @@ final class JellyfinProvider {
                 limit: 200,
                 isRecursive: true,
                 includeItemTypes: [.audio, .audioBook, .book, .episode, .movie, .musicAlbum, .video],
+                fields: [.tags],
                 enableUserData: true,
                 imageTypeLimit: 1,
                 enableImageTypes: [.primary],
@@ -114,23 +123,27 @@ final class JellyfinProvider {
             )
             let response = try await client.send(Paths.getItems(parameters: parameters))
             entries = (response.value.items ?? []).compactMap { item in
-                guard let id = item.id, let title = item.name, let kind = mediaKind(for: item.type) else { return nil }
+                guard let id = item.id, let title = item.name, let kind = mediaKind(for: item) else { return nil }
                 let creator = item.albumArtist
                     ?? item.artists?.joined(separator: ", ")
                     ?? item.seriesName
                     ?? item.album
                     ?? ""
+                let gameSystem = kind == .game
+                    ? item.tags?.first { $0.caseInsensitiveCompare("JellyEmu") != .orderedSame }
+                    : nil
                 return JellyfinLibraryEntry(
                     id: id,
                     title: title,
                     creator: creator,
                     kind: kind,
+                    gameSystem: gameSystem,
                     overview: item.overview ?? "",
                     durationSeconds: Double(item.runTimeTicks ?? 0) / 10_000_000,
                     resumeSeconds: Double(item.userData?.playbackPositionTicks ?? 0) / 10_000_000,
-                    isPlayable: item.type.map {
+                    isPlayable: kind == .game || (item.type.map {
                         [BaseItemKind.audio, .episode, .movie, .musicVideo, .video].contains($0)
-                    } ?? false,
+                    } ?? false),
                     imageURL: imageURL(for: item, serverURL: client.configuration.url)
                 )
             }
@@ -199,6 +212,20 @@ final class JellyfinProvider {
             playSessionID: playbackInfo.playSessionID,
             streamURL: streamURL
         )
+    }
+
+    func gamePlayerConfiguration(for item: JellyfinLibraryEntry) -> JellyEmuGameConfiguration? {
+        guard item.kind == .game,
+              let userID,
+              let accessToken,
+              let serverURL = normalizedServerURL(serverAddress),
+              var components = URLComponents(url: serverURL, resolvingAgainstBaseURL: false) else { return nil }
+
+        let basePath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        components.path = "/" + [basePath, "jellyemu", "play", item.id].filter { !$0.isEmpty }.joined(separator: "/")
+        components.queryItems = [URLQueryItem(name: "userId", value: userID)]
+        guard let playURL = components.url else { return nil }
+        return JellyEmuGameConfiguration(itemID: item.id, userID: userID, accessToken: accessToken, playURL: playURL)
     }
 
     func reportPlaybackStarted(_ session: JellyfinPlaybackSession, positionSeconds: Double) async {
@@ -294,6 +321,14 @@ final class JellyfinProvider {
         default:
             return nil
         }
+    }
+
+    private func mediaKind(for item: BaseItemDto) -> MediaKind? {
+        if item.type == .book,
+           item.tags?.contains(where: { $0.caseInsensitiveCompare("JellyEmu") == .orderedSame }) == true {
+            return .game
+        }
+        return mediaKind(for: item.type)
     }
 
     private func imageURL(for item: BaseItemDto, serverURL: URL) -> URL? {

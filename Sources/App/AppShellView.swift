@@ -929,8 +929,8 @@ private struct SettingsSheet: View {
 private struct JellyfinLibrarySheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(JellyfinProvider.self) private var jellyfin
-    @Environment(PlaybackCoordinator.self) private var playback
     @State private var filter = "all"
+    @State private var selectedEntry: JellyfinLibraryEntry?
 
     private var visibleItems: [JellyfinLibraryEntry] {
         guard filter != "all" else { return jellyfin.entries }
@@ -945,6 +945,7 @@ private struct JellyfinLibrarySheet: View {
                     Text("Music").tag(MediaKind.music.rawValue)
                     Text("Video").tag(MediaKind.video.rawValue)
                     Text("Books").tag(MediaKind.book.rawValue)
+                    Text("Games").tag(MediaKind.game.rawValue)
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal, 16)
@@ -958,7 +959,7 @@ private struct JellyfinLibrarySheet: View {
                     ScrollView {
                         LazyVStack(spacing: 9) {
                             ForEach(visibleItems) { item in
-                                JellyfinEntryRow(item: item, action: item.isPlayable ? { startPlayback(item) } : nil)
+                                JellyfinEntryRow(item: item) { selectedEntry = item }
                             }
                         }
                         .padding(.horizontal, 16)
@@ -986,17 +987,13 @@ private struct JellyfinLibrarySheet: View {
                         .padding(12).frame(maxWidth: .infinity).background(.red.opacity(0.85))
                 }
             }
+            .sheet(item: $selectedEntry) { item in
+                JellyfinEntryDetailSheet(item: item) { }
+            }
         }
         .preferredColorScheme(.dark)
     }
 
-    private func startPlayback(_ entry: JellyfinLibraryEntry) {
-        Task {
-            if await startJellyfinPlayback(entry, provider: jellyfin, playback: playback) {
-                dismiss()
-            }
-        }
-    }
 }
 
 @MainActor
@@ -1034,6 +1031,8 @@ private struct JellyfinEntryDetailSheet: View {
     let item: JellyfinLibraryEntry
     let onPlaybackStarted: () -> Void
     @State private var isStartingPlayback = false
+    @State private var gameConfiguration: JellyEmuGameConfiguration?
+    @State private var showingGamePlayer = false
 
     var body: some View {
         NavigationStack {
@@ -1051,12 +1050,31 @@ private struct JellyfinEntryDetailSheet: View {
                     .frame(maxWidth: .infinity).frame(height: 220).clipShape(RoundedRectangle(cornerRadius: 20))
 
                     Text(item.title).font(.system(size: 25, weight: .bold, design: .rounded)).foregroundStyle(.white)
-                    Text([item.creator, item.kind.title, "Jellyfin"].filter { !$0.isEmpty }.joined(separator: " · "))
+                    Text([item.gameSystem ?? "", item.creator, item.kind.title, "Jellyfin"].filter { !$0.isEmpty }.joined(separator: " · "))
                         .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
                     if !item.overview.isEmpty {
                         Text(item.overview).font(.system(size: 14, design: .rounded)).foregroundStyle(.white.opacity(0.84))
                     }
-                    if item.isPlayable {
+                    if item.kind == .game {
+                        Button {
+                            guard let configuration = jellyfin.gamePlayerConfiguration(for: item) else {
+                                jellyfin.handlePlaybackFailure(JellyfinGameError.unavailable)
+                                return
+                            }
+                            gameConfiguration = configuration
+                            showingGamePlayer = true
+                        } label: {
+                            Label("Play with JellyEmu", systemImage: "gamecontroller.fill")
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                .foregroundStyle(MediaPalette.background).frame(maxWidth: .infinity).padding(14)
+                                .background(MediaPalette.accent, in: Capsule())
+                        }
+                        if let error = jellyfin.errorMessage {
+                            Text(error).font(.system(size: 12, design: .rounded)).foregroundStyle(.red)
+                        }
+                        Text("Game playback is provided by the JellyEmu server plugin.")
+                            .font(.system(size: 11, design: .rounded)).foregroundStyle(MediaPalette.muted)
+                    } else if item.isPlayable {
                         Button {
                             Task {
                                 isStartingPlayback = true
@@ -1091,7 +1109,17 @@ private struct JellyfinEntryDetailSheet: View {
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
         }
         .preferredColorScheme(.dark).presentationDetents([.medium, .large])
+        .fullScreenCover(isPresented: $showingGamePlayer) {
+            if let gameConfiguration {
+                JellyEmuGamePlayer(configuration: gameConfiguration)
+            }
+        }
     }
+}
+
+private enum JellyfinGameError: LocalizedError {
+    case unavailable
+    var errorDescription: String? { "The JellyEmu player URL is unavailable. Reconnect to the Jellyfin server and try again." }
 }
 
 private struct JellyfinEntryRow: View {
@@ -1120,7 +1148,7 @@ private struct JellyfinEntryRow: View {
                 .frame(width: 52, height: 52).clipShape(RoundedRectangle(cornerRadius: 12))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(item.title).font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1)
-                    Text([item.creator, item.kind.title, "Jellyfin"].filter { !$0.isEmpty }.joined(separator: " · "))
+                    Text([item.gameSystem ?? "", item.creator, item.kind.title, "Jellyfin"].filter { !$0.isEmpty }.joined(separator: " · "))
                         .font(.system(size: 10, design: .rounded)).foregroundStyle(MediaPalette.muted).lineLimit(1)
                 }
                 Spacer()
