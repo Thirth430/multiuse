@@ -36,6 +36,8 @@ The iOS RetroArch URI handler is designed around locally addressable content; th
 
 The strictest checked-in toolchain requirement is Readium's Swift 6.2 package; LocalMusic uses Swift 6 and iOS 18, Jellyfin uses Swift 6 and iOS 16, while Readium and MPVKit declare iOS 15. A practical first target is iOS 18 with a current Xcode toolchain, then lowering the target only after the LocalMusic APIs and all transitive dependencies compile at that deployment version. Keep dependencies modular and do not add the GPL products by default. Pin package versions/revisions and commit the resolved dependency graph before release.
 
+MPVKit source review: the package offers LGPL and GPL products assembled from many prebuilt native XCFrameworks; its Swift target is a shim around libmpv/FFmpeg rather than a ready-made SwiftUI player. The checked-in iOS demo manages the low-level libmpv C API and an OpenGL renderer itself, and the README cautions that the project is mainly for learning and is not maintained frequently. Keep AVPlayer as the production baseline for now; only prototype an MPVKit adapter after a Mac build proves the LGPL product works, actual AVPlayer gaps are demonstrated with target media, and the bundled binary/license/source obligations are understood. Do not use the GPL product by default.
+
 The workspace runs on Windows, so Xcode, iOS Simulator, device signing, and iOS runtime verification are unavailable here. A successful iOS build or working playback must not be claimed until checked on macOS with Xcode and a device/simulator.
 
 ## Licensing and distribution gate

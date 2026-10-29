@@ -42,6 +42,7 @@ struct AppShellView: View {
     @State private var showingSearch = false
     @State private var showingSettings = false
     @State private var showingPlayer = false
+    @State private var showingFullscreenVideo = false
     @State private var showingJellyfinLibrary = false
     @State private var showingPlaylistEditor = false
     @State private var showingPlaylistDetail = false
@@ -86,8 +87,11 @@ struct AppShellView: View {
         }
         .sheet(isPresented: $showingSearch) { searchSheet }
         .sheet(isPresented: $showingSettings) { SettingsSheet() }
-        .sheet(isPresented: $showingPlayer) { NowPlayingSheet() }
-        .sheet(isPresented: $showingJellyfinLibrary) { JellyfinLibrarySheet() }
+        .sheet(isPresented: $showingPlayer) { NowPlayingSheet(showingFullscreenVideo: $showingFullscreenVideo) }
+        .fullScreenCover(isPresented: $showingFullscreenVideo) { FullScreenVideoPlayer() }
+        .sheet(isPresented: $showingJellyfinLibrary) {
+            JellyfinLibrarySheet { kind in openPlayback(for: kind, closingJellyfinLibrary: true) }
+        }
         .sheet(isPresented: $showingPlaylistEditor) {
             MusicPlaylistEditorSheet(
                 tracks: items.filter { $0.kind == .music },
@@ -131,7 +135,8 @@ struct AppShellView: View {
                     let index = queue.firstIndex(where: { $0.id == selectedItem.id }) ?? 0
                     playback.play(selectedItem, queue: queue, startIndex: index)
                     showingDetail = false
-                    showingPlayer = true
+                    if selectedItem.kind == .video { showingFullscreenVideo = true }
+                    else { showingPlayer = true }
                 }
             }
         }
@@ -517,7 +522,9 @@ struct AppShellView: View {
             .navigationTitle("Search").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { showingSearch = false } } }
             .sheet(item: $selectedServerEntry) { item in
-                JellyfinEntryDetailSheet(item: item) { showingSearch = false }
+                JellyfinEntryDetailSheet(item: item) {
+                    openPlayback(for: item.kind, closingSearch: true)
+                }
             }
         }
         .preferredColorScheme(.dark).presentationDetents([.medium, .large])
@@ -541,6 +548,16 @@ struct AppShellView: View {
     }
 
     private func open(_ item: MediaLibraryRecord) { selectedItem = item; showingDetail = true }
+
+    private func openPlayback(for kind: MediaKind, closingSearch: Bool = false, closingJellyfinLibrary: Bool = false) {
+        if closingSearch { showingSearch = false }
+        if closingJellyfinLibrary { showingJellyfinLibrary = false }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            if kind == .video { showingFullscreenVideo = true }
+            else { showingPlayer = true }
+        }
+    }
 
     private func categoryGradient(_ kind: MediaKind) -> LinearGradient {
         let colors: [Color]
@@ -701,6 +718,7 @@ private struct MediaDetailSheet: View {
 private struct NowPlayingSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(PlaybackCoordinator.self) private var playback
+    @Binding var showingFullscreenVideo: Bool
 
     var body: some View {
         VStack(spacing: 17) {
@@ -711,7 +729,17 @@ private struct NowPlayingSheet: View {
             }
             if let item = playback.currentItem {
                 if item.kind == .video {
-                    VideoPlayer(player: playback.player).frame(height: 230).clipShape(RoundedRectangle(cornerRadius: 18))
+                    VideoPlayer(player: playback.player)
+                        .frame(height: 230).clipShape(RoundedRectangle(cornerRadius: 18))
+                        .overlay(alignment: .topTrailing) {
+                            Button { showingFullscreenVideo = true } label: {
+                                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                    .font(.system(size: 12, weight: .bold)).foregroundStyle(.white)
+                                    .padding(10).background(.black.opacity(0.65), in: Circle())
+                            }
+                            .accessibilityLabel("Expand video")
+                            .padding(9)
+                        }
                     videoTrackControls
                 }
                 else { MediaArtwork(kind: item.kind, size: 180, artworkURL: item.artworkURL).frame(maxWidth: .infinity).padding(.vertical, 13) }
@@ -774,6 +802,75 @@ private struct NowPlayingSheet: View {
                 Spacer()
             }
             .foregroundStyle(MediaPalette.accent)
+        }
+    }
+}
+
+private struct FullScreenVideoPlayer: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(PlaybackCoordinator.self) private var playback
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VideoPlayer(player: playback.player).ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack(alignment: .top, spacing: 12) {
+                    Button { dismiss() } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
+                            .frame(width: 40, height: 40).background(.black.opacity(0.62), in: Circle())
+                    }
+                    .accessibilityLabel("Close video player")
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(playback.currentItem?.title ?? "Video")
+                            .font(.system(size: 15, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1)
+                        Text(playback.currentItem?.origin == "Jellyfin" ? "Jellyfin server" : "Local library")
+                            .font(.system(size: 11, design: .rounded)).foregroundStyle(.white.opacity(0.72))
+                    }
+                    Spacer(minLength: 0)
+                    fullscreenTrackControls
+                }
+                .padding(.horizontal, 18).padding(.top, 12).padding(.bottom, 24)
+                .background(LinearGradient(colors: [.black.opacity(0.78), .clear], startPoint: .top, endPoint: .bottom))
+                Spacer()
+                if let error = playback.errorMessage {
+                    Text(error).font(.system(size: 12, design: .rounded)).foregroundStyle(.white)
+                        .padding(12).background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 12))
+                        .padding(.bottom, 28)
+                }
+            }
+        }
+        .statusBarHidden()
+        .preferredColorScheme(.dark)
+    }
+
+    @ViewBuilder
+    private var fullscreenTrackControls: some View {
+        HStack(spacing: 8) {
+            if playback.videoAudioTrackTitles.count > 1 {
+                Menu {
+                    ForEach(Array(playback.videoAudioTrackTitles.enumerated()), id: \.offset) { index, title in
+                        Button(title) { playback.selectVideoAudioTrack(index) }
+                    }
+                } label: {
+                    Image(systemName: "speaker.wave.2").font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white).frame(width: 38, height: 38).background(.black.opacity(0.62), in: Circle())
+                }
+                .accessibilityLabel("Audio tracks")
+            }
+            if !playback.videoSubtitleTrackTitles.isEmpty {
+                Menu {
+                    Button("Off") { playback.selectVideoSubtitleTrack(nil) }
+                    ForEach(Array(playback.videoSubtitleTrackTitles.enumerated()), id: \.offset) { index, title in
+                        Button(title) { playback.selectVideoSubtitleTrack(index) }
+                    }
+                } label: {
+                    Image(systemName: "captions.bubble").font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white).frame(width: 38, height: 38).background(.black.opacity(0.62), in: Circle())
+                }
+                .accessibilityLabel("Subtitle tracks")
+            }
         }
     }
 }
@@ -929,6 +1026,7 @@ private struct SettingsSheet: View {
 private struct JellyfinLibrarySheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(JellyfinProvider.self) private var jellyfin
+    let onPlaybackStarted: (MediaKind) -> Void
     @State private var filter = "all"
     @State private var selectedEntry: JellyfinLibraryEntry?
 
@@ -988,7 +1086,7 @@ private struct JellyfinLibrarySheet: View {
                 }
             }
             .sheet(item: $selectedEntry) { item in
-                JellyfinEntryDetailSheet(item: item) { }
+                JellyfinEntryDetailSheet(item: item) { onPlaybackStarted(item.kind) }
             }
         }
         .preferredColorScheme(.dark)
