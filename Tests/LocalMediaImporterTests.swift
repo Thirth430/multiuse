@@ -19,13 +19,14 @@ final class LocalMediaImporterTests: XCTestCase {
         let summary = await LocalMediaImporter.importFiles([source], into: container.mainContext)
         let items = try container.mainContext.fetch(FetchDescriptor<MediaLibraryRecord>())
 
-        XCTAssertEqual(summary.importedCount, 1)
-        XCTAssertTrue(summary.failures.isEmpty)
-        XCTAssertEqual(items.count, 1)
-        XCTAssertEqual(items[0].title, "Late Night")
-        XCTAssertEqual(items[0].kind, MediaKind.music)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: items[0].localURL.path))
-        try? FileManager.default.removeItem(at: items[0].localURL)
+        XCTAssertEqual(summary.importedCount, 1, "Import summary: \(summary.failures.joined(separator: "; "))")
+        XCTAssertTrue(summary.failures.isEmpty, "Import reported failures: \(summary.failures.joined(separator: "; "))")
+        XCTAssertEqual(items.count, 1, "Expected one saved catalog record; import summary: \(summary.importedCount), failures: \(summary.failures)")
+        guard let item = items.first else { return }
+        XCTAssertEqual(item.title, "Late Night", "Imported title should fall back to the source filename")
+        XCTAssertEqual(item.kind, MediaKind.music, "An MP3 extension should classify as music")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: item.localURL.path), "Imported file is missing at \(item.localURL.path)")
+        try? FileManager.default.removeItem(at: item.localURL)
     }
 
     func testUnsupportedFileIsReportedWithoutCatalogEntry() async throws {
