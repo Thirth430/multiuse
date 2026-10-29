@@ -6,6 +6,8 @@ import UIKit
 @MainActor
 @Observable
 final class PlaybackCoordinator {
+    private static let bufferingMessage = "Playback is buffering. It will resume when data is available."
+
     let player = AVPlayer()
     private(set) var currentItem: MediaLibraryRecord?
     private(set) var isPlaying = false
@@ -63,6 +65,18 @@ final class PlaybackCoordinator {
         })
         notificationTokens.append(center.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor [weak self] in self?.advanceAfterCompletion() }
+        })
+        notificationTokens.append(center.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: nil, queue: .main) { [weak self] notification in
+            guard let failedItem = notification.object as? AVPlayerItem else { return }
+            let failedItemID = ObjectIdentifier(failedItem)
+            let message = (notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? NSError)?.localizedDescription
+                ?? "The media could not be decoded or streamed."
+            Task { @MainActor [weak self] in self?.handlePlaybackFailure(itemID: failedItemID, message: message) }
+        })
+        notificationTokens.append(center.addObserver(forName: .AVPlayerItemPlaybackStalled, object: nil, queue: .main) { [weak self] notification in
+            guard let stalledItem = notification.object as? AVPlayerItem else { return }
+            let stalledItemID = ObjectIdentifier(stalledItem)
+            Task { @MainActor [weak self] in self?.handlePlaybackStall(itemID: stalledItemID) }
         })
     }
 
@@ -238,6 +252,22 @@ final class PlaybackCoordinator {
         }
     }
 
+    private func handlePlaybackFailure(itemID: ObjectIdentifier, message: String) {
+        guard let currentPlayerItem = player.currentItem,
+              ObjectIdentifier(currentPlayerItem) == itemID else { return }
+        player.pause()
+        isPlaying = false
+        errorMessage = "Playback failed: \(message)"
+        endRemoteSession()
+        updateNowPlayingInfo()
+    }
+
+    private func handlePlaybackStall(itemID: ObjectIdentifier) {
+        guard let currentPlayerItem = player.currentItem,
+              ObjectIdentifier(currentPlayerItem) == itemID else { return }
+        errorMessage = Self.bufferingMessage
+    }
+
     func seek(to seconds: Double) {
         guard seconds.isFinite, seconds >= 0 else { return }
         player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
@@ -285,6 +315,7 @@ final class PlaybackCoordinator {
             currentItem.durationSeconds = duration
         }
         isPlaying = player.rate > 0
+        if isPlaying, errorMessage == Self.bufferingMessage { errorMessage = nil }
         updateNowPlayingInfo()
         if let remoteSession, let remoteProvider {
             let now = Date.now
