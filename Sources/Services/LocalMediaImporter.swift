@@ -63,6 +63,17 @@ enum LocalMediaImporter {
                     if let artworkData = metadata.artworkData {
                         artworkFileName = await MediaArtworkStore.save(artworkData)
                     }
+                } else if kind == .video {
+                    let metadata = await LocalVideoMetadataLoader.loadVideo(
+                        at: URL(fileURLWithPath: destinationPath),
+                        fallbackTitle: sourceURL.deletingPathExtension().lastPathComponent
+                    )
+                    title = metadata.title
+                    creator = metadata.creator
+                    duration = metadata.duration
+                    if let artworkData = metadata.artworkData {
+                        artworkFileName = await MediaArtworkStore.save(artworkData)
+                    }
                 }
 
                 let record = MediaLibraryRecord(

@@ -45,7 +45,9 @@
 ## Phase 5 — Video engine decision
 
 - [x] Add embedded audio and subtitle selection for AVPlayer-supported video assets.
+- [x] Read local video title, creator, and duration tags and save embedded cover art or an asynchronously generated poster frame.
 - [ ] Verify selectable tracks on sample local and Jellyfin assets; external subtitle loading remains unimplemented.
+- [ ] Verify imported video metadata and poster extraction on the GitHub iOS runner/device.
 - [ ] Compare AVPlayer format coverage with the desired formats using sample files.
 - [ ] Review MPVKit binary provenance, transitive licenses, distribution size, and thermal behavior.
 - [ ] Decide whether MPVKit's LGPL product is needed for formats AVPlayer cannot play, then validate its iOS integration and distribution costs.
