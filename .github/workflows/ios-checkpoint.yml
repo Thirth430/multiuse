@@ -24,8 +24,20 @@ jobs:
             echo "No available iPhone simulator was found on this runner." >&2
             exit 1
           fi
+          RESULT_BUNDLE="$RUNNER_TEMP/UnifiedMedia.xcresult"
+          set +e
           xcodebuild test \
             -project UnifiedMedia.xcodeproj \
             -scheme UnifiedMedia \
             -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
-            -derivedDataPath "$RUNNER_TEMP/UnifiedMediaDerivedData"
+            -derivedDataPath "$RUNNER_TEMP/UnifiedMediaDerivedData" \
+            -resultBundlePath "$RESULT_BUNDLE"
+          TEST_STATUS=$?
+          set -e
+          if [ "$TEST_STATUS" -ne 0 ]; then
+            echo "Xcode test summary:" >&2
+            xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE" || true
+            echo "Xcode test tree and failure details:" >&2
+            xcrun xcresulttool get test-results tests --path "$RESULT_BUNDLE" || true
+            exit "$TEST_STATUS"
+          fi
