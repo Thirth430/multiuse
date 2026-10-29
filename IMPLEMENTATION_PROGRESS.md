@@ -41,6 +41,7 @@
 - [x] Add manual URL and username/password sign-in and save the returned session token in iOS Keychain (password is not retained).
 - [x] Fetch server audio, albums, videos, episodes, and books and normalize title, creator, category, duration, and primary-artwork URL for the shared search/library UI.
 - [x] Add server browsing, media-type filters, local-plus-server search, refresh, and disconnect controls.
+- [x] Add Jellyfin-backed favorite state and toggle actions in server item details; show favorite markers in server browse rows.
 - [x] Open Jellyfin search results in an in-app detail view with direct playback for playable items and a clear browse-only state for server books.
 - [x] Wire Jellyfin playback-info/stream URLs into the shared AVPlayer and report server playback start, periodic progress, stop, and resume position.
 - [ ] Verify package resolution, authentication, artwork, pagination, and network failures with a live Jellyfin server on the GitHub runner/device; revisit a newer SDK pin after upstream compiler compatibility is confirmed.
@@ -66,10 +67,11 @@
 - [x] Inspect the added JellyEmu source: it is a .NET 9/Jellyfin server plugin, not a linkable iOS emulator. Confirm its Jellyfin book/tag catalog convention, web player route, ROM streaming, saves, sessions, and RetroArch playlist API.
 - [x] Classify JellyEmu-tagged Jellyfin book items as games, expose the game system tag and Games filter, and connect game details to the plugin's `/jellyemu/play/{itemId}` route in a native-hosted WKWebView with its expected token hook.
 - [ ] Verify plugin compatibility, player loading, touch/gamepad controls, save-state behavior, and exit/session handling on a supported iOS simulator/device with a live server; this integration is currently unverified.
+- [ ] Verify Jellyfin favorite toggling and restored favorite state against a live server.
 - [ ] Audit EmulatorJS and emulator core licenses/provenance independently from JellyEmu's MIT license.
 - [ ] Implement controller mapping, save paths, favorites, and game metadata without bundling copyrighted game content.
 - [ ] Prototype the cross-media 2D collection experience after core media paths are usable.
 
 ## Verification policy
 
-This project is being edited on Windows without Xcode or iOS Simulator. GitHub iOS checkpoint run #23 passed on commit `086aaa3f013ef9755d8516f18f685ab21898a1af`. JellyEmu catalog and WKWebView changes are newer and have not been built or tested. Device playback, artwork extraction, reader presentation, video track selection, game UI, and live Jellyfin/JellyEmu behavior still need runtime verification. Live-server testing requires a Jellyfin server with JellyEmu installed and accessible.
+This project is being edited on Windows without Xcode or iOS Simulator. The user confirmed the GitHub iOS checkpoint passed on commit `12adb17539436a4e8e8da50a44c791ff06d26f2c`, including the JellyEmu build fixes. Live game playback still needs a JellyEmu-enabled server and simulator/device verification. Device playback, artwork extraction, reader presentation, video track selection, game UI, and other live Jellyfin behavior also remain runtime checks.

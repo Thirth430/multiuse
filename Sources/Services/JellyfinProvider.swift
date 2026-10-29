@@ -13,6 +13,7 @@ struct JellyfinLibraryEntry: Identifiable, Equatable {
     let overview: String
     let durationSeconds: Double
     let resumeSeconds: Double
+    var isFavorite: Bool
     let isPlayable: Bool
     let imageURL: URL?
 }
@@ -41,6 +42,7 @@ final class JellyfinProvider {
     private(set) var connectedServerName: String?
     private(set) var isLoading = false
     private(set) var errorMessage: String?
+    private(set) var favoriteUpdatingIDs: Set<String> = []
 
     @ObservationIgnored private var client: JellyfinClient?
     @ObservationIgnored private var userID: String?
@@ -141,6 +143,7 @@ final class JellyfinProvider {
                     overview: item.overview ?? "",
                     durationSeconds: Double(item.runTimeTicks ?? 0) / 10_000_000,
                     resumeSeconds: Double(item.userData?.playbackPositionTicks ?? 0) / 10_000_000,
+                    isFavorite: item.userData?.isFavorite ?? false,
                     isPlayable: kind == .game || (item.type.map {
                         [BaseItemKind.audio, .episode, .movie, .musicVideo, .video].contains($0)
                     } ?? false),
@@ -161,8 +164,33 @@ final class JellyfinProvider {
         accessToken = nil
         connectedServerName = nil
         entries = []
+        favoriteUpdatingIDs = []
         errorMessage = nil
         credentialStore.remove()
+    }
+
+    func setFavorite(itemID: String, isFavorite: Bool) async {
+        guard let client, let userID else {
+            errorMessage = "Reconnect to Jellyfin before changing favorites."
+            return
+        }
+        guard !favoriteUpdatingIDs.contains(itemID) else { return }
+        favoriteUpdatingIDs.insert(itemID)
+        defer { favoriteUpdatingIDs.remove(itemID) }
+
+        do {
+            if isFavorite {
+                _ = try await client.send(Paths.markFavoriteItem(itemID: itemID, userID: userID))
+            } else {
+                _ = try await client.send(Paths.unmarkFavoriteItem(itemID: itemID, userID: userID))
+            }
+            if let index = entries.firstIndex(where: { $0.id == itemID }) {
+                entries[index].isFavorite = isFavorite
+            }
+            errorMessage = nil
+        } catch {
+            errorMessage = "Could not update the Jellyfin favorite: \(error.localizedDescription)"
+        }
     }
 
     func preparePlayback(for item: JellyfinLibraryEntry) async throws -> JellyfinPlaybackSession {

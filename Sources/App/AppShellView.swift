@@ -1034,6 +1034,10 @@ private struct JellyfinEntryDetailSheet: View {
     @State private var gameConfiguration: JellyEmuGameConfiguration?
     @State private var showingGamePlayer = false
 
+    private var isFavorite: Bool {
+        jellyfin.entries.first(where: { $0.id == item.id })?.isFavorite ?? item.isFavorite
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -1055,6 +1059,19 @@ private struct JellyfinEntryDetailSheet: View {
                     if !item.overview.isEmpty {
                         Text(item.overview).font(.system(size: 14, design: .rounded)).foregroundStyle(.white.opacity(0.84))
                     }
+                    Button {
+                        Task { await jellyfin.setFavorite(itemID: item.id, isFavorite: !isFavorite) }
+                    } label: {
+                        Label(isFavorite ? "Favorited on Jellyfin" : "Add to Favorites", systemImage: isFavorite ? "heart.fill" : "heart")
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundStyle(isFavorite ? .pink : MediaPalette.accent)
+                            .frame(maxWidth: .infinity).padding(12)
+                            .background(MediaPalette.surface, in: Capsule())
+                    }
+                    .disabled(jellyfin.favoriteUpdatingIDs.contains(item.id))
+                    if let error = jellyfin.errorMessage {
+                        Text(error).font(.system(size: 12, design: .rounded)).foregroundStyle(.red)
+                    }
                     if item.kind == .game {
                         Button {
                             guard let configuration = jellyfin.gamePlayerConfiguration(for: item) else {
@@ -1068,9 +1085,6 @@ private struct JellyfinEntryDetailSheet: View {
                                 .font(.system(size: 14, weight: .bold, design: .rounded))
                                 .foregroundStyle(MediaPalette.background).frame(maxWidth: .infinity).padding(14)
                                 .background(MediaPalette.accent, in: Capsule())
-                        }
-                        if let error = jellyfin.errorMessage {
-                            Text(error).font(.system(size: 12, design: .rounded)).foregroundStyle(.red)
                         }
                         Text("Game playback is provided by the JellyEmu server plugin.")
                             .font(.system(size: 11, design: .rounded)).foregroundStyle(MediaPalette.muted)
@@ -1092,9 +1106,6 @@ private struct JellyfinEntryDetailSheet: View {
                                 .background(MediaPalette.accent, in: Capsule())
                         }
                         .disabled(isStartingPlayback)
-                        if let error = jellyfin.errorMessage {
-                            Text(error).font(.system(size: 12, design: .rounded)).foregroundStyle(.red)
-                        }
                     } else {
                         Label(item.kind == .book ? "Server books are browse-only here" : "This server item can’t be played here", systemImage: "info.circle")
                             .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
@@ -1152,6 +1163,9 @@ private struct JellyfinEntryRow: View {
                         .font(.system(size: 10, design: .rounded)).foregroundStyle(MediaPalette.muted).lineLimit(1)
                 }
                 Spacer()
+                if item.isFavorite {
+                    Image(systemName: "heart.fill").font(.system(size: 11)).foregroundStyle(.pink)
+                }
                 Image(systemName: "server.rack").font(.system(size: 11)).foregroundStyle(MediaPalette.muted)
             }
             .padding(9).background(MediaPalette.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 15))
