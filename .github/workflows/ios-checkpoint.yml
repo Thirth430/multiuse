@@ -35,9 +35,20 @@ jobs:
           TEST_STATUS=$?
           set -e
           if [ "$TEST_STATUS" -ne 0 ]; then
-            echo "Xcode test summary:" >&2
-            xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE" || true
-            echo "Xcode test tree and failure details:" >&2
-            xcrun xcresulttool get test-results tests --path "$RESULT_BUNDLE" || true
+            DIAGNOSTICS="$RUNNER_TEMP/UnifiedMedia-test-diagnostics.txt"
+            {
+              echo "Xcode test summary:"
+              xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE" || true
+              echo
+              echo "Xcode test tree and failure details:"
+              xcrun xcresulttool get test-results tests --path "$RESULT_BUNDLE" || true
+            } > "$DIAGNOSTICS" 2>&1
+            cat "$DIAGNOSTICS" >&2
+            {
+              echo "### iOS test failure details"
+              echo '```text'
+              cat "$DIAGNOSTICS"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
             exit "$TEST_STATUS"
           fi
