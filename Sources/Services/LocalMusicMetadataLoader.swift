@@ -13,8 +13,8 @@ struct ImportedAudioMetadata: Sendable {
 /// preserves its tag-first title, artist, album, duration, and artwork behavior
 /// while keeping the unified library's own catalog model and interface.
 enum LocalMusicMetadataLoader {
-    static func loadAudio(at url: URL) async -> ImportedAudioMetadata {
-        var title = url.deletingPathExtension().lastPathComponent
+    static func loadAudio(at url: URL, fallbackTitle: String? = nil) async -> ImportedAudioMetadata {
+        var title = fallbackTitle ?? url.deletingPathExtension().lastPathComponent
         var artist = "Unknown Artist"
         var album = "Unknown Album"
         var duration = 0.0

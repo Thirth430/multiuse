@@ -52,7 +52,10 @@ enum LocalMediaImporter {
                 var duration = 0.0
                 var artworkFileName: String?
                 if kind == .music {
-                    let metadata = await LocalMusicMetadataLoader.loadAudio(at: URL(fileURLWithPath: destinationPath))
+                    let metadata = await LocalMusicMetadataLoader.loadAudio(
+                        at: URL(fileURLWithPath: destinationPath),
+                        fallbackTitle: sourceURL.deletingPathExtension().lastPathComponent
+                    )
                     title = metadata.title
                     creator = metadata.artist
                     collection = metadata.album
