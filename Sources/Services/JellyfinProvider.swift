@@ -112,19 +112,33 @@ final class JellyfinProvider {
         defer { isLoading = false }
 
         do {
-            let parameters = Paths.GetItemsParameters(
-                userID: userID,
-                limit: 200,
-                isRecursive: true,
-                fields: [.tags],
-                includeItemTypes: [.audio, .audioBook, .book, .episode, .movie, .musicAlbum, .video],
-                enableUserData: true,
-                imageTypeLimit: 1,
-                enableImageTypes: [.primary],
-                enableImages: true
-            )
-            let response = try await client.send(Paths.getItems(parameters: parameters))
-            entries = (response.value.items ?? []).compactMap { item in
+            let pageSize = 200
+            var startIndex = 0
+            var serverItems: [BaseItemDto] = []
+            while true {
+                let parameters = Paths.GetItemsParameters(
+                    userID: userID,
+                    startIndex: startIndex,
+                    limit: pageSize,
+                    isRecursive: true,
+                    fields: [.tags],
+                    includeItemTypes: [.audio, .audioBook, .book, .episode, .movie, .musicAlbum, .video],
+                    enableUserData: true,
+                    imageTypeLimit: 1,
+                    enableImageTypes: [.primary],
+                    enableTotalRecordCount: true,
+                    enableImages: true
+                )
+                let response = try await client.send(Paths.getItems(parameters: parameters))
+                let page = response.value.items ?? []
+                serverItems.append(contentsOf: page)
+                startIndex += page.count
+
+                guard page.count == pageSize,
+                      response.value.totalRecordCount.map({ startIndex < $0 }) ?? true else { break }
+            }
+
+            entries = serverItems.compactMap { item in
                 guard let id = item.id, let title = item.name, let kind = mediaKind(for: item) else { return nil }
                 let creator = item.albumArtist
                     ?? item.artists?.joined(separator: ", ")
