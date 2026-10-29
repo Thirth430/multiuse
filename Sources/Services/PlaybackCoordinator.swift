@@ -177,9 +177,10 @@ final class PlaybackCoordinator {
     }
 
     private func loadVideoTrackOptions(from asset: AVAsset, itemID: String) async {
-        async let audioResult = try? asset.loadMediaSelectionGroup(for: .audible)
-        async let subtitleResult = try? asset.loadMediaSelectionGroup(for: .legible)
-        let (audioGroup, subtitleGroup) = await (audioResult, subtitleResult)
+        // AVAsset is not Sendable. Load its selection groups sequentially so
+        // Swift 6 does not send the same asset into two concurrent child tasks.
+        let audioGroup = try? await asset.loadMediaSelectionGroup(for: .audible)
+        let subtitleGroup = try? await asset.loadMediaSelectionGroup(for: .legible)
         guard currentItem?.id == itemID else { return }
 
         videoAudioGroup = audioGroup
