@@ -49,6 +49,7 @@ struct AppShellView: View {
     @State private var editingPlaylist: MusicPlaylist?
     @State private var selectedPlaylist: MusicPlaylist?
     @State private var selectedMusicCollection: MusicCollectionSelection?
+    @State private var selectedServerEntry: JellyfinLibraryEntry?
     @State private var selectedItem: MediaLibraryRecord?
     @State private var showingDetail = false
     @State private var alertMessage: String?
@@ -501,8 +502,7 @@ struct AppShellView: View {
                         ForEach(searchResults, id: \.id) { item in MediaRow(item: item) { open(item); showingSearch = false } }
                         ForEach(serverSearchResults) { item in
                             JellyfinEntryRow(item: item) {
-                                showingSearch = false
-                                showingJellyfinLibrary = true
+                                selectedServerEntry = item
                             }
                         }
                     }
@@ -516,6 +516,9 @@ struct AppShellView: View {
             .padding(18).background(MediaPalette.background)
             .navigationTitle("Search").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { showingSearch = false } } }
+            .sheet(item: $selectedServerEntry) { item in
+                JellyfinEntryDetailSheet(item: item) { showingSearch = false }
+            }
         }
         .preferredColorScheme(.dark).presentationDetents([.medium, .large])
     }
@@ -912,24 +915,105 @@ private struct JellyfinLibrarySheet: View {
 
     private func startPlayback(_ entry: JellyfinLibraryEntry) {
         Task {
-            do {
-                let session = try await jellyfin.preparePlayback(for: entry)
-                let record = MediaLibraryRecord(
-                    origin: "Jellyfin",
-                    kind: entry.kind,
-                    title: entry.title,
-                    creator: entry.creator,
-                    fileName: entry.id,
-                    fileExtension: ""
-                )
-                record.progressSeconds = entry.resumeSeconds
-                record.durationSeconds = entry.durationSeconds
-                playback.playRemote(record, session: session, provider: jellyfin)
+            if await startJellyfinPlayback(entry, provider: jellyfin, playback: playback) {
                 dismiss()
-            } catch {
-                jellyfin.handlePlaybackFailure(error)
             }
         }
+    }
+}
+
+@MainActor
+private func startJellyfinPlayback(
+    _ entry: JellyfinLibraryEntry,
+    provider: JellyfinProvider,
+    playback: PlaybackCoordinator
+) async -> Bool {
+    do {
+        let session = try await provider.preparePlayback(for: entry)
+        let record = MediaLibraryRecord(
+            id: "jellyfin:\(entry.id)",
+            providerID: entry.id,
+            origin: "Jellyfin",
+            kind: entry.kind,
+            title: entry.title,
+            creator: entry.creator,
+            fileName: entry.id,
+            fileExtension: ""
+        )
+        record.progressSeconds = entry.resumeSeconds
+        record.durationSeconds = entry.durationSeconds
+        playback.playRemote(record, session: session, provider: provider)
+        return true
+    } catch {
+        provider.handlePlaybackFailure(error)
+        return false
+    }
+}
+
+private struct JellyfinEntryDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(JellyfinProvider.self) private var jellyfin
+    @Environment(PlaybackCoordinator.self) private var playback
+    let item: JellyfinLibraryEntry
+    let onPlaybackStarted: () -> Void
+    @State private var isStartingPlayback = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    AsyncImage(url: item.imageURL) { phase in
+                        if let image = phase.image {
+                            image.resizable().scaledToFill()
+                        } else {
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(MediaPalette.accent.opacity(0.13))
+                                .overlay(Image(systemName: item.kind.symbol).font(.system(size: 36)).foregroundStyle(MediaPalette.accent))
+                        }
+                    }
+                    .frame(maxWidth: .infinity).frame(height: 220).clipShape(RoundedRectangle(cornerRadius: 20))
+
+                    Text(item.title).font(.system(size: 25, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                    Text([item.creator, item.kind.title, "Jellyfin"].filter { !$0.isEmpty }.joined(separator: " · "))
+                        .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
+                    if !item.overview.isEmpty {
+                        Text(item.overview).font(.system(size: 14, design: .rounded)).foregroundStyle(.white.opacity(0.84))
+                    }
+                    if item.isPlayable {
+                        Button {
+                            Task {
+                                isStartingPlayback = true
+                                let started = await startJellyfinPlayback(item, provider: jellyfin, playback: playback)
+                                isStartingPlayback = false
+                                if started {
+                                    dismiss()
+                                    onPlaybackStarted()
+                                }
+                            }
+                        } label: {
+                            Label(isStartingPlayback ? "Connecting…" : "Play", systemImage: isStartingPlayback ? "hourglass" : "play.fill")
+                                .font(.system(size: 14, weight: .bold, design: .rounded))
+                                .foregroundStyle(MediaPalette.background).frame(maxWidth: .infinity).padding(14)
+                                .background(MediaPalette.accent, in: Capsule())
+                        }
+                        .disabled(isStartingPlayback)
+                        if let error = jellyfin.errorMessage {
+                            Text(error).font(.system(size: 12, design: .rounded)).foregroundStyle(.red)
+                        }
+                    } else {
+                        Label(item.kind == .book ? "Server books are browse-only here" : "This server item can’t be played here", systemImage: "info.circle")
+                            .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
+                            .padding(13).frame(maxWidth: .infinity, alignment: .leading).background(MediaPalette.surface, in: RoundedRectangle(cornerRadius: 14))
+                    }
+                }
+                .padding(20)
+            }
+            .background(MediaPalette.background)
+            .navigationTitle("Jellyfin")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
+        }
+        .preferredColorScheme(.dark).presentationDetents([.medium, .large])
     }
 }
 

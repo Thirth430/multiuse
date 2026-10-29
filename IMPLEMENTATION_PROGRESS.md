@@ -40,6 +40,7 @@
 - [x] Add manual URL and username/password sign-in and save the returned session token in iOS Keychain (password is not retained).
 - [x] Fetch server audio, albums, videos, episodes, and books and normalize title, creator, category, duration, and primary-artwork URL for the shared search/library UI.
 - [x] Add server browsing, media-type filters, local-plus-server search, refresh, and disconnect controls.
+- [x] Open Jellyfin search results in an in-app detail view with direct playback for playable items and a clear browse-only state for server books.
 - [x] Wire Jellyfin playback-info/stream URLs into the shared AVPlayer and report server playback start, periodic progress, stop, and resume position.
 - [ ] Verify package resolution, authentication, artwork, pagination, and network failures with a live Jellyfin server on the GitHub runner/device; revisit a newer SDK pin after upstream compiler compatibility is confirmed.
 - [ ] Verify remote audio/video streaming, resume seeking, and Jellyfin session progress/stopped reporting against a live server; subtitle selection and server-side transcoding profile negotiation remain unimplemented.
