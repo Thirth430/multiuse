@@ -27,11 +27,11 @@
 
 ## Phase 4 — Jellyfin server provider (in progress)
 
-- [x] Add the checked-out Jellyfin Swift SDK as a pinned Swift package dependency.
+- [x] Add Jellyfin Swift SDK 2.0.0 as a pinned Swift package dependency; 3.4.0 failed in SDK WebSocket source under the GitHub runner's Swift compiler.
 - [x] Add manual URL and username/password sign-in and save the returned session token in iOS Keychain (password is not retained).
 - [x] Fetch server audio, albums, videos, episodes, and books and normalize title, creator, category, duration, and primary-artwork URL for the shared search/library UI.
 - [x] Add server browsing, media-type filters, local-plus-server search, refresh, and disconnect controls.
-- [ ] Verify package resolution, authentication, artwork, pagination, and network failures with a live Jellyfin server on the GitHub runner/device.
+- [ ] Verify package resolution, authentication, artwork, pagination, and network failures with a live Jellyfin server on the GitHub runner/device; revisit a newer SDK pin after upstream compiler compatibility is confirmed.
 - [ ] Add remote playback, session reporting, and server resume progress; remote catalog entries are browse-only in this checkpoint.
 
 ## Phase 5 — Video engine decision

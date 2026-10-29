@@ -23,11 +23,11 @@ Permission is granted, free of charge, to any person obtaining a copy of this so
 ## Jellyfin Swift SDK
 
 - Source: [jellyfin/jellyfin-sdk-swift](https://github.com/jellyfin/jellyfin-sdk-swift)
-- Revision: `e69dd0358ad33148aded867661e27d71de29d0c3`
+- Version: `2.0.0` (`185ef233c05bd889dbb9d9fa49ceb34b1dd16b43`)
 - License: Mozilla Public License 2.0
 - Copyright: Copyright (c) 2026 Jellyfin & Jellyfin Contributors
 
-The SDK is included as the `JellyfinAPI` Swift package product. Its upstream `LICENSE.md` contains the full MPL-2.0 text. Include that text in the distributed app's legal notices and retain source availability/notice obligations for any covered modifications.
+The SDK is included as the `JellyfinAPI` Swift package product. Version 3.4.0 from the inspected checkout fails to compile with the GitHub runner's Swift compiler because its WebSocket source uses an invalid optional existential spelling (`Error?`). Version 2.0.0 retains the sign-in and item-catalog API surface used by this app and avoids that source error. Reassess the pin when a newer compatible upstream release is available. The full MPL-2.0 text is bundled in `Sources/Resources/ThirdPartyLicenses/Jellyfin-Swift-SDK-MPL-2.0.txt`; retain source availability/notice obligations for covered modifications.
 
 ## Other checked-out projects
 
