@@ -11,7 +11,16 @@ struct JellyfinLibraryEntry: Identifiable, Equatable {
     let kind: MediaKind
     let overview: String
     let durationSeconds: Double
+    let resumeSeconds: Double
+    let isPlayable: Bool
     let imageURL: URL?
+}
+
+struct JellyfinPlaybackSession: Sendable {
+    let itemID: String
+    let mediaSourceID: String?
+    let playSessionID: String?
+    let streamURL: URL
 }
 
 @MainActor
@@ -118,6 +127,10 @@ final class JellyfinProvider {
                     kind: kind,
                     overview: item.overview ?? "",
                     durationSeconds: Double(item.runTimeTicks ?? 0) / 10_000_000,
+                    resumeSeconds: Double(item.userData?.playbackPositionTicks ?? 0) / 10_000_000,
+                    isPlayable: item.type.map {
+                        [BaseItemKind.audio, .episode, .movie, .musicVideo, .video].contains($0)
+                    } ?? false,
                     imageURL: imageURL(for: item, serverURL: client.configuration.url)
                 )
             }
@@ -137,6 +150,102 @@ final class JellyfinProvider {
         entries = []
         errorMessage = nil
         credentialStore.remove()
+    }
+
+    func preparePlayback(for item: JellyfinLibraryEntry) async throws -> JellyfinPlaybackSession {
+        guard item.isPlayable, let client, let userID else {
+            throw JellyfinProviderError.playbackUnavailable
+        }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        let playbackInfo = try await client.send(Paths.getPlaybackInfo(itemID: item.id, userID: userID)).value
+        guard let mediaSource = playbackInfo.mediaSources?.first else {
+            throw JellyfinProviderError.noMediaSource
+        }
+
+        let streamURL: URL?
+        if item.kind == .video {
+            streamURL = client.url(
+                with: Paths.getVideoStream(
+                    itemID: item.id,
+                    parameters: .init(
+                        playSessionID: playbackInfo.playSessionID,
+                        mediaSourceID: mediaSource.id,
+                        deviceID: client.configuration.deviceID
+                    )
+                ),
+                queryAPIKey: true
+            )
+        } else {
+            streamURL = client.url(
+                with: Paths.getAudioStream(
+                    itemID: item.id,
+                    parameters: .init(
+                        playSessionID: playbackInfo.playSessionID,
+                        mediaSourceID: mediaSource.id,
+                        deviceID: client.configuration.deviceID
+                    )
+                ),
+                queryAPIKey: true
+            )
+        }
+        guard let streamURL else {
+            throw JellyfinProviderError.invalidStreamURL
+        }
+        return JellyfinPlaybackSession(
+            itemID: item.id,
+            mediaSourceID: mediaSource.id,
+            playSessionID: playbackInfo.playSessionID,
+            streamURL: streamURL
+        )
+    }
+
+    func reportPlaybackStarted(_ session: JellyfinPlaybackSession, positionSeconds: Double) async {
+        guard let client else { return }
+        let body = playbackState(session, positionSeconds: positionSeconds, isPaused: false)
+        try? await client.send(Paths.reportPlaybackStart(body))
+    }
+
+    func reportPlaybackProgress(_ session: JellyfinPlaybackSession, positionSeconds: Double, isPaused: Bool) async {
+        guard let client else { return }
+        let body = playbackState(session, positionSeconds: positionSeconds, isPaused: isPaused)
+        try? await client.send(Paths.reportPlaybackProgress(body))
+    }
+
+    func reportPlaybackStopped(_ session: JellyfinPlaybackSession, positionSeconds: Double) async {
+        guard let client else { return }
+        let body = PlaybackStopInfo(
+            itemID: session.itemID,
+            mediaSourceID: session.mediaSourceID,
+            playSessionID: session.playSessionID,
+            positionTicks: positionTicks(positionSeconds)
+        )
+        try? await client.send(Paths.reportPlaybackStopped(body))
+    }
+
+    func handlePlaybackFailure(_ error: Error) {
+        errorMessage = "Could not start server playback: \(error.localizedDescription)"
+    }
+
+    private func playbackState(
+        _ session: JellyfinPlaybackSession,
+        positionSeconds: Double,
+        isPaused: Bool
+    ) -> PlaybackStateInfo {
+        PlaybackStateInfo(
+            canSeek: true,
+            isPaused: isPaused,
+            itemID: session.itemID,
+            mediaSourceID: session.mediaSourceID,
+            playSessionID: session.playSessionID,
+            positionTicks: positionTicks(positionSeconds)
+        )
+    }
+
+    private func positionTicks(_ seconds: Double) -> Int {
+        guard seconds.isFinite, seconds > 0 else { return 0 }
+        return Int(min(seconds, 86_400 * 365) * 10_000_000)
     }
 
     private func makeClient(urlString: String, token: String?) -> JellyfinClient? {
@@ -262,6 +371,9 @@ private struct JellyfinCredentialStore {
 private enum JellyfinProviderError: LocalizedError {
     case incompleteAuthentication
     case secureStorage(OSStatus)
+    case playbackUnavailable
+    case noMediaSource
+    case invalidStreamURL
 
     var errorDescription: String? {
         switch self {
@@ -269,6 +381,12 @@ private enum JellyfinProviderError: LocalizedError {
             "The server signed in without returning a usable user session."
         case let .secureStorage(status):
             "iOS could not securely save the server session (Keychain status \(status))."
+        case .playbackUnavailable:
+            "This server item is not playable here. Music and video tracks can be played; books and albums are browse-only."
+        case .noMediaSource:
+            "The Jellyfin server did not provide a playable media source for this item."
+        case .invalidStreamURL:
+            "The Jellyfin server returned an invalid stream address."
         }
     }
 }

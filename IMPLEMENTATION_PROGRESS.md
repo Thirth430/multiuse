@@ -31,8 +31,9 @@
 - [x] Add manual URL and username/password sign-in and save the returned session token in iOS Keychain (password is not retained).
 - [x] Fetch server audio, albums, videos, episodes, and books and normalize title, creator, category, duration, and primary-artwork URL for the shared search/library UI.
 - [x] Add server browsing, media-type filters, local-plus-server search, refresh, and disconnect controls.
+- [x] Wire Jellyfin playback-info/stream URLs into the shared AVPlayer and report server playback start, periodic progress, stop, and resume position.
 - [ ] Verify package resolution, authentication, artwork, pagination, and network failures with a live Jellyfin server on the GitHub runner/device; revisit a newer SDK pin after upstream compiler compatibility is confirmed.
-- [ ] Add remote playback, session reporting, and server resume progress; remote catalog entries are browse-only in this checkpoint.
+- [ ] Verify remote audio/video streaming, resume seeking, and Jellyfin session progress/stopped reporting against a live server; subtitle selection and server-side transcoding profile negotiation remain unimplemented.
 
 ## Phase 5 — Video engine decision
 
@@ -48,4 +49,4 @@
 
 ## Verification policy
 
-This project is being edited on Windows without Xcode or iOS Simulator. No iOS build or simulator test has been claimed for the Jellyfin changes. The checkpoint workflow is `.github/workflows/ios-checkpoint.yml`, and this project has an `origin` remote. After the Jellyfin changes are committed and pushed, the user should run the workflow and share its result before platform-specific fixes are treated as verified. Live-server behavior also needs a real Jellyfin server account and network test.
+This project is being edited on Windows without Xcode or iOS Simulator. No iOS build or simulator test has been claimed for the new remote playback wiring. The checkpoint workflow is `.github/workflows/ios-checkpoint.yml`, and this project has an `origin` remote. After the changes are committed and pushed, the user should run the workflow and share its result before platform-specific fixes are treated as verified. Live-server behavior also needs a real Jellyfin server account and network test.

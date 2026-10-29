@@ -474,7 +474,8 @@ private struct NowPlayingSheet: View {
                 else { MediaArtwork(kind: item.kind, size: 180).frame(maxWidth: .infinity).padding(.vertical, 13) }
                 VStack(alignment: .leading, spacing: 5) {
                     Text(item.title).font(.system(size: 21, weight: .bold, design: .rounded)).foregroundStyle(.white).lineLimit(2)
-                    Text(item.creator.isEmpty ? "\(item.kind.title) · Local library" : item.creator).font(.system(size: 13, design: .rounded)).foregroundStyle(MediaPalette.muted)
+                    Text(item.creator.isEmpty ? "\(item.kind.title) · \(item.origin == "Jellyfin" ? "Jellyfin server" : "Local library")" : item.creator)
+                        .font(.system(size: 13, design: .rounded)).foregroundStyle(MediaPalette.muted)
                 }
                 Slider(value: Binding(get: { playback.elapsedSeconds }, set: { playback.seek(to: $0) }), in: 0...max(playback.durationSeconds, 1)).tint(MediaPalette.accent)
                 HStack { Text(timeLabel(playback.elapsedSeconds)); Spacer(); Text(timeLabel(playback.durationSeconds)) }
@@ -517,7 +518,7 @@ private struct SettingsSheet: View {
                             .foregroundStyle(.green)
                         Text("\(jellyfin.entries.count) music, video, and book items loaded")
                             .font(.caption).foregroundStyle(.secondary)
-                        Text("Server catalog browsing and unified search are connected. Remote playback and server progress reporting remain future work.")
+                        Text("Server browsing, AVPlayer streaming, and progress reporting are wired; live-server playback checks remain.")
                             .font(.caption).foregroundStyle(.secondary)
                         Button {
                             Task { await jellyfin.refreshLibrary() }
@@ -577,6 +578,7 @@ private struct SettingsSheet: View {
 private struct JellyfinLibrarySheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(JellyfinProvider.self) private var jellyfin
+    @Environment(PlaybackCoordinator.self) private var playback
     @State private var filter = "all"
 
     private var visibleItems: [JellyfinLibraryEntry] {
@@ -604,7 +606,9 @@ private struct JellyfinLibrarySheet: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 9) {
-                            ForEach(visibleItems) { item in JellyfinEntryRow(item: item) }
+                            ForEach(visibleItems) { item in
+                                JellyfinEntryRow(item: item, action: item.isPlayable ? { startPlayback(item) } : nil)
+                            }
                         }
                         .padding(.horizontal, 16)
                     }
@@ -633,6 +637,28 @@ private struct JellyfinLibrarySheet: View {
             }
         }
         .preferredColorScheme(.dark)
+    }
+
+    private func startPlayback(_ entry: JellyfinLibraryEntry) {
+        Task {
+            do {
+                let session = try await jellyfin.preparePlayback(for: entry)
+                let record = MediaLibraryRecord(
+                    origin: "Jellyfin",
+                    kind: entry.kind,
+                    title: entry.title,
+                    creator: entry.creator,
+                    fileName: entry.id,
+                    fileExtension: ""
+                )
+                record.progressSeconds = entry.resumeSeconds
+                record.durationSeconds = entry.durationSeconds
+                playback.playRemote(record, session: session, provider: jellyfin)
+                dismiss()
+            } catch {
+                jellyfin.handlePlaybackFailure(error)
+            }
+        }
     }
 }
 
