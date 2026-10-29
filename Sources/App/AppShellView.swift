@@ -1098,23 +1098,38 @@ private struct JellyfinLibrarySheet: View {
 private func startJellyfinPlayback(
     _ entry: JellyfinLibraryEntry,
     provider: JellyfinProvider,
-    playback: PlaybackCoordinator
+    playback: PlaybackCoordinator,
+    queue serverQueue: [JellyfinLibraryEntry] = [],
+    startIndex: Int = 0
 ) async -> Bool {
     do {
-        let session = try await provider.preparePlayback(for: entry)
-        let record = MediaLibraryRecord(
-            id: "jellyfin:\(entry.id)",
-            providerID: entry.id,
-            origin: "Jellyfin",
-            kind: entry.kind,
-            title: entry.title,
-            creator: entry.creator,
-            fileName: entry.id,
-            fileExtension: ""
+        let entries = serverQueue.isEmpty ? [entry] : serverQueue
+        let selectedIndex = min(max(startIndex, 0), entries.count - 1)
+        let selectedEntry = entries[selectedIndex]
+        let session = try await provider.preparePlayback(for: selectedEntry)
+        let records = entries.map { entry in
+            let record = MediaLibraryRecord(
+                id: "jellyfin:\(entry.id)",
+                providerID: entry.id,
+                origin: "Jellyfin",
+                kind: entry.kind,
+                title: entry.title,
+                creator: entry.creator,
+                fileName: entry.id,
+                fileExtension: ""
+            )
+            record.progressSeconds = entry.resumeSeconds
+            record.durationSeconds = entry.durationSeconds
+            return record
+        }
+        playback.playRemote(
+            records[selectedIndex],
+            session: session,
+            provider: provider,
+            queue: records,
+            serverQueue: entries,
+            startIndex: selectedIndex
         )
-        record.progressSeconds = entry.resumeSeconds
-        record.durationSeconds = entry.durationSeconds
-        playback.playRemote(record, session: session, provider: provider)
         return true
     } catch {
         provider.handlePlaybackFailure(error)
@@ -1166,7 +1181,31 @@ private struct JellyfinEntryDetailSheet: View {
                     }
                     if item.isAlbum || item.isPlaylist {
                         VStack(alignment: .leading, spacing: 9) {
-                            Text("Tracks").font(.system(size: 16, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                            HStack {
+                                Text("Tracks").font(.system(size: 16, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                                Spacer()
+                                if !albumTracks.isEmpty {
+                                    Button("Play All", systemImage: "play.fill") {
+                                        Task {
+                                            isStartingPlayback = true
+                                            let started = await startJellyfinPlayback(
+                                                albumTracks[0],
+                                                provider: jellyfin,
+                                                playback: playback,
+                                                queue: albumTracks
+                                            )
+                                            isStartingPlayback = false
+                                            if started {
+                                                dismiss()
+                                                onPlaybackStarted()
+                                            }
+                                        }
+                                    }
+                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                    .tint(MediaPalette.accent)
+                                    .disabled(isStartingPlayback)
+                                }
+                            }
                             if isLoadingAlbumTracks {
                                 ProgressView("Loading tracks…").tint(MediaPalette.accent)
                             } else if let albumTracksError {
@@ -1175,7 +1214,8 @@ private struct JellyfinEntryDetailSheet: View {
                                 Text(item.isPlaylist ? "This playlist has no available tracks." : "This album has no available tracks.")
                                     .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
                             } else {
-                                ForEach(albumTracks) { track in
+                                ForEach(albumTracks.indices, id: \.self) { index in
+                                    let track = albumTracks[index]
                                     HStack(spacing: 10) {
                                         MediaArtwork(kind: .music, size: 38, artworkURL: track.imageURL)
                                         VStack(alignment: .leading, spacing: 3) {
@@ -1186,7 +1226,13 @@ private struct JellyfinEntryDetailSheet: View {
                                         Button {
                                             Task {
                                                 isStartingPlayback = true
-                                                let started = await startJellyfinPlayback(track, provider: jellyfin, playback: playback)
+                                                let started = await startJellyfinPlayback(
+                                                    track,
+                                                    provider: jellyfin,
+                                                    playback: playback,
+                                                    queue: albumTracks,
+                                                    startIndex: index
+                                                )
                                                 isStartingPlayback = false
                                                 if started {
                                                     dismiss()

@@ -16,6 +16,7 @@ final class PlaybackCoordinator {
     private(set) var videoSubtitleTrackTitles: [String] = []
     @ObservationIgnored private var remoteSession: JellyfinPlaybackSession?
     @ObservationIgnored private var remoteProvider: JellyfinProvider?
+    @ObservationIgnored private var remoteQueue: [JellyfinLibraryEntry] = []
     @ObservationIgnored private var lastRemoteProgressReport = Date.distantPast
     private var queue: [MediaLibraryRecord] = []
     private var queueIndex = 0
@@ -69,7 +70,9 @@ final class PlaybackCoordinator {
         guard item.kind == .music || item.kind == .video else { return }
         queue = items.isEmpty ? [item] : items
         queueIndex = min(max(startIndex, 0), queue.count - 1)
+        remoteQueue = []
         endRemoteSession()
+        remoteProvider = nil
         guard FileManager.default.fileExists(atPath: item.localURL.path) else {
             errorMessage = "This file is no longer available in the app library. You can remove it and import it again."
             return
@@ -81,12 +84,16 @@ final class PlaybackCoordinator {
     func playRemote(
         _ item: MediaLibraryRecord,
         session: JellyfinPlaybackSession,
-        provider: JellyfinProvider
+        provider: JellyfinProvider,
+        queue items: [MediaLibraryRecord] = [],
+        serverQueue: [JellyfinLibraryEntry] = [],
+        startIndex: Int = 0
     ) {
         guard item.kind == .music || item.kind == .video else { return }
         endRemoteSession()
-        queue = [item]
-        queueIndex = 0
+        queue = items.isEmpty ? [item] : items
+        queueIndex = min(max(startIndex, 0), queue.count - 1)
+        remoteQueue = serverQueue
         remoteSession = session
         remoteProvider = provider
         lastRemoteProgressReport = .now
@@ -146,13 +153,22 @@ final class PlaybackCoordinator {
 
     func playNext() {
         guard !queue.isEmpty else { return }
-        queueIndex = (queueIndex + 1) % queue.count
-        play(queue[queueIndex], queue: queue, startIndex: queueIndex)
+        let nextIndex = (queueIndex + 1) % queue.count
+        if !remoteQueue.isEmpty {
+            Task { await playRemoteQueueItem(at: nextIndex) }
+        } else {
+            queueIndex = nextIndex
+            play(queue[queueIndex], queue: queue, startIndex: queueIndex)
+        }
     }
 
     func playQueuedItem(at index: Int) {
         guard queue.indices.contains(index) else { return }
-        play(queue[index], queue: queue, startIndex: index)
+        if !remoteQueue.isEmpty {
+            Task { await playRemoteQueueItem(at: index) }
+        } else {
+            play(queue[index], queue: queue, startIndex: index)
+        }
     }
 
     func moveUpcomingItem(from source: Int, to destination: Int) {
@@ -162,25 +178,64 @@ final class PlaybackCoordinator {
               destination >= 0, destination < upcomingCount else { return }
         let item = queue.remove(at: startIndex + source)
         queue.insert(item, at: startIndex + destination)
+        if !remoteQueue.isEmpty {
+            let remoteItem = remoteQueue.remove(at: startIndex + source)
+            remoteQueue.insert(remoteItem, at: startIndex + destination)
+        }
     }
 
     func removeUpcomingItem(at index: Int) {
         let absoluteIndex = queueIndex + 1 + index
         guard absoluteIndex > queueIndex, queue.indices.contains(absoluteIndex) else { return }
         queue.remove(at: absoluteIndex)
+        if !remoteQueue.isEmpty, remoteQueue.indices.contains(absoluteIndex) {
+            remoteQueue.remove(at: absoluteIndex)
+        }
     }
 
     private func advanceAfterCompletion() {
         guard queueIndex + 1 < queue.count else { stop(); return }
-        queueIndex += 1
-        play(queue[queueIndex], queue: queue, startIndex: queueIndex)
+        let nextIndex = queueIndex + 1
+        if !remoteQueue.isEmpty {
+            Task { await playRemoteQueueItem(at: nextIndex) }
+        } else {
+            queueIndex = nextIndex
+            play(queue[queueIndex], queue: queue, startIndex: queueIndex)
+        }
     }
 
     func playPrevious() {
         guard !queue.isEmpty else { return }
         if elapsedSeconds > 3 { seek(to: 0); return }
-        queueIndex = (queueIndex - 1 + queue.count) % queue.count
-        play(queue[queueIndex], queue: queue, startIndex: queueIndex)
+        let previousIndex = (queueIndex - 1 + queue.count) % queue.count
+        if !remoteQueue.isEmpty {
+            Task { await playRemoteQueueItem(at: previousIndex) }
+        } else {
+            queueIndex = previousIndex
+            play(queue[queueIndex], queue: queue, startIndex: queueIndex)
+        }
+    }
+
+    private func playRemoteQueueItem(at index: Int) async {
+        guard queue.indices.contains(index), remoteQueue.indices.contains(index),
+              let provider = remoteProvider else { return }
+        let record = queue[index]
+        do {
+            let session = try await provider.preparePlayback(for: remoteQueue[index])
+            endRemoteSession()
+            remoteProvider = provider
+            remoteSession = session
+            lastRemoteProgressReport = .now
+            queueIndex = index
+            guard start(record, from: session.streamURL, at: record.progressSeconds) else {
+                endRemoteSession()
+                return
+            }
+            Task { await provider.reportPlaybackStarted(session, positionSeconds: record.progressSeconds) }
+        } catch {
+            provider.handlePlaybackFailure(error)
+            errorMessage = "Could not start the next Jellyfin track: \(error.localizedDescription)"
+        }
     }
 
     func seek(to seconds: Double) {
@@ -257,6 +312,9 @@ final class PlaybackCoordinator {
 
         let currentID = currentItem?.id
         queue.removeAll { $0.id == itemID }
+        if !remoteQueue.isEmpty {
+            remoteQueue.removeAll { $0.id == itemID || "jellyfin:\($0.id)" == itemID }
+        }
         if let currentID, let currentIndex = queue.firstIndex(where: { $0.id == currentID }) {
             queueIndex = currentIndex
         } else {
@@ -273,6 +331,8 @@ final class PlaybackCoordinator {
         elapsedSeconds = 0
         durationSeconds = 0
         queue = []
+        remoteQueue = []
+        remoteProvider = nil
         queueIndex = 0
         videoAudioGroup = nil
         videoSubtitleGroup = nil
@@ -287,7 +347,7 @@ final class PlaybackCoordinator {
         guard let remoteSession, let remoteProvider else { return }
         let position = elapsedSeconds
         self.remoteSession = nil
-        self.remoteProvider = nil
+        if remoteQueue.isEmpty { self.remoteProvider = nil }
         Task { await remoteProvider.reportPlaybackStopped(remoteSession, positionSeconds: position) }
     }
 
