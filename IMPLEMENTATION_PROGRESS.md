@@ -54,6 +54,9 @@
 
 ## Phase 6 — Retro games and optional signature feature
 
+- [x] Import local game files for the listed cartridge and disc image extensions, identify the associated system, and use shared favorites/search/catalog details.
+- [x] Clearly mark game launch unavailable until a suitable licensed and iOS-compatible core runtime is linked.
+- [ ] Verify local game-file import, system classification, and favorites on the GitHub iOS runner/device.
 - [ ] Select a Libretro boundary and audit each proposed core's license and iOS build.
 - [ ] Implement controller mapping, save paths, favorites, and game metadata without bundling copyrighted game content.
 - [ ] Prototype the cross-media 2D collection experience after core media paths are usable.

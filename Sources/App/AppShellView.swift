@@ -248,10 +248,8 @@ struct AppShellView: View {
                         Label("Playlist", systemImage: "plus").font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(MediaPalette.accent)
                     }
                 }
-                if section != .game {
-                    Button { showingImporter = true } label: {
-                        Label("Import", systemImage: "plus").font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(MediaPalette.accent)
-                    }
+                Button { showingImporter = true } label: {
+                    Label(section == .game ? "Add games" : "Import", systemImage: "plus").font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(MediaPalette.accent)
                 }
             }
             if section == .music {
@@ -267,7 +265,7 @@ struct AppShellView: View {
             } else if collection.isEmpty { collectionEmptyState(for: kind) }
             else { ForEach(collection, id: \.id) { item in MediaRow(item: item) { open(item) } } }
             if section == .game {
-                Text("Game runtime is planned. No emulator cores or game files are bundled.")
+                Text("Local game files are cataloged by system. Emulation launch is unavailable until a compatible, licensed core runtime is integrated. No games or BIOS files are bundled.")
                     .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
                     .padding(14).frame(maxWidth: .infinity, alignment: .leading).background(MediaPalette.surface, in: RoundedRectangle(cornerRadius: 14))
             }
@@ -397,10 +395,11 @@ struct AppShellView: View {
             Text(kind == .book ? "No books yet" : kind == .game ? "Game library is not connected" : "Nothing here yet")
                 .font(.system(size: 16, weight: .bold, design: .rounded)).foregroundStyle(.white)
             Text(emptyDescription(for: kind)).font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
-            if kind != .game {
-                Button { showingImporter = true } label: { Label("Import files", systemImage: "plus").font(.system(size: 12, weight: .semibold, design: .rounded)) }
-                    .tint(MediaPalette.accent).padding(.top, 3)
+            Button { showingImporter = true } label: {
+                Label(kind == .game ? "Import game files" : "Import files", systemImage: "plus")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
             }
+            .tint(MediaPalette.accent).padding(.top, 3)
         }
         .padding(18).frame(maxWidth: .infinity, alignment: .leading).background(MediaPalette.surface, in: RoundedRectangle(cornerRadius: 18))
     }
@@ -410,7 +409,7 @@ struct AppShellView: View {
         case .music: "Import audio files to build your local music library."
         case .video: "Import MP4, M4V, or MOV files to watch them here."
         case .book: "Open EPUB books and CBZ comics with Readium. CBR is not supported by the inspected Readium source."
-        case .game: "The game catalog and emulator runtime are not connected yet."
+        case .game: "Import supported ROM files to build a local catalog. Core-based emulation is not available yet."
         case nil: "Import local media or connect a server from Settings."
         }
     }
@@ -610,13 +609,28 @@ private struct MediaDetailSheet: View {
             HStack { Spacer(); Button { dismiss() } label: { Image(systemName: "xmark").font(.system(size: 12, weight: .bold)).foregroundStyle(MediaPalette.muted).padding(10).background(MediaPalette.surface, in: Circle()) } }
             MediaArtwork(kind: item.kind, size: 92, artworkURL: item.artworkURL).frame(maxWidth: .infinity)
             Text(item.title).font(.system(size: 24, weight: .bold, design: .rounded)).foregroundStyle(.white)
-            Text("\(item.kind.title) · \(item.fileExtension.uppercased()) · \(item.origin)")
+            Text("\(item.kind.title) · \(item.fileExtension.uppercased()) · \(item.creator.isEmpty ? item.origin : item.creator)")
                 .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
             if item.kind == .music || item.kind == .video {
                 Button(action: play) {
                     Label("Play", systemImage: "play.fill").font(.system(size: 14, weight: .bold, design: .rounded))
                         .foregroundStyle(MediaPalette.background).frame(maxWidth: .infinity).padding(14).background(MediaPalette.accent, in: Capsule())
                 }
+            } else if item.kind == .game {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Game file saved", systemImage: "checkmark.circle.fill")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(.green)
+                    Text("The local catalog recognizes this system, but no compatible emulator core is linked yet.")
+                        .font(.system(size: 11, design: .rounded)).foregroundStyle(MediaPalette.muted)
+                    Button {} label: {
+                        Label("Launch unavailable", systemImage: "gamecontroller")
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundStyle(MediaPalette.muted).frame(maxWidth: .infinity).padding(13)
+                            .background(MediaPalette.surface, in: Capsule())
+                    }
+                    .disabled(true)
+                }
+                .padding(14).background(MediaPalette.surface, in: RoundedRectangle(cornerRadius: 15))
             } else if item.kind == .book {
                 Button { showingReader = true } label: {
                     Label(item.fileExtension == "cbz" ? "Read comic" : "Read book", systemImage: "book.open.fill")

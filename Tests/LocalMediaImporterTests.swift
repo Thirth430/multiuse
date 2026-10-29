@@ -48,4 +48,30 @@ final class LocalMediaImporterTests: XCTestCase {
         XCTAssertEqual(summary.failures.count, 1)
         XCTAssertTrue(items.isEmpty)
     }
+
+    func testImportsGameFileAndIdentifiesItsSystem() async throws {
+        let container = try ModelContainer(
+            for: MediaLibraryRecord.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let sourceDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: sourceDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: sourceDirectory) }
+
+        let source = sourceDirectory.appendingPathComponent("Metroid.gba")
+        try Data(repeating: 0, count: 512).write(to: source)
+
+        let summary = await LocalMediaImporter.importFiles([source], into: container.mainContext)
+        let items = try container.mainContext.fetch(FetchDescriptor<MediaLibraryRecord>())
+
+        XCTAssertEqual(summary.importedCount, 1, "Import failures: \(summary.failures)")
+        XCTAssertEqual(items.count, 1)
+        guard let game = items.first else { return }
+        XCTAssertEqual(game.title, "Metroid")
+        XCTAssertEqual(game.kind, MediaKind.game)
+        XCTAssertEqual(game.creator, "Game Boy Advance")
+        XCTAssertEqual(game.collection, "Game Boy Advance")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: game.localURL.path))
+        try? FileManager.default.removeItem(at: game.localURL)
+    }
 }

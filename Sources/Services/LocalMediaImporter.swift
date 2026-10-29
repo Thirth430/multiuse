@@ -10,7 +10,9 @@ struct LocalImportSummary: Sendable {
 @MainActor
 enum LocalMediaImporter {
     static var allowedContentTypes: [UTType] {
-        [.audio, .movie, UTType(filenameExtension: "epub") ?? .data, UTType(filenameExtension: "cbz") ?? .data]
+        let gameTypes = ["nes", "gb", "gbc", "gba", "sfc", "smc", "n64", "z64", "nds", "gen", "md", "sms", "gg", "pce"]
+            .compactMap { UTType(filenameExtension: $0) }
+        return [.audio, .movie, UTType(filenameExtension: "epub") ?? .data, UTType(filenameExtension: "cbz") ?? .data] + gameTypes
     }
 
     /// Copies selected documents into the app container so imports remain
@@ -74,6 +76,9 @@ enum LocalMediaImporter {
                     if let artworkData = metadata.artworkData {
                         artworkFileName = await MediaArtworkStore.save(artworkData)
                     }
+                } else if kind == .game, let system = gameSystem(for: extensionName) {
+                    creator = system
+                    collection = system
                 }
 
                 let record = MediaLibraryRecord(
@@ -106,6 +111,24 @@ enum LocalMediaImporter {
         case "mp3", "m4a", "aac", "wav", "aif", "aiff", "flac", "caf", "opus": .music
         case "mp4", "m4v", "mov": .video
         case "epub", "cbz": .book
+        case "nes", "gb", "gbc", "gba", "sfc", "smc", "n64", "z64", "nds", "gen", "md", "sms", "gg", "pce": .game
+        default: nil
+        }
+    }
+
+    private static func gameSystem(for fileExtension: String) -> String? {
+        switch fileExtension.lowercased() {
+        case "nes": "NES"
+        case "gb": "Game Boy"
+        case "gbc": "Game Boy Color"
+        case "gba": "Game Boy Advance"
+        case "sfc", "smc": "Super Nintendo"
+        case "n64", "z64": "Nintendo 64"
+        case "nds": "Nintendo DS"
+        case "gen", "md": "Sega Genesis / Mega Drive"
+        case "sms": "Sega Master System"
+        case "gg": "Game Gear"
+        case "pce": "TurboGrafx-16"
         default: nil
         }
     }
