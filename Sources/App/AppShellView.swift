@@ -600,6 +600,10 @@ private struct MediaArtwork: View {
 private struct MediaDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @Environment(PlaybackCoordinator.self) private var playback
+    @Query(sort: \MusicPlaylist.updatedAt, order: .reverse) private var playlists: [MusicPlaylist]
+    @State private var showingRemovalConfirmation = false
+    @State private var removalError: String?
     @State private var showingReader = false
     let item: MediaLibraryRecord
     let play: () -> Void
@@ -647,19 +651,46 @@ private struct MediaDetailSheet: View {
                 .tint(item.isFavorite ? .pink : MediaPalette.accent)
                 Spacer()
                 Button(role: .destructive) {
-                    try? FileManager.default.removeItem(at: item.localURL)
-                    modelContext.delete(item)
-                    try? modelContext.save()
-                    dismiss()
+                    showingRemovalConfirmation = true
                 } label: { Label("Remove", systemImage: "trash") }.font(.system(size: 12, weight: .medium, design: .rounded))
             }
             Spacer()
         }
         .padding(22).background(MediaPalette.background.ignoresSafeArea())
         .presentationDetents([.medium, .large]).preferredColorScheme(.dark)
+        .confirmationDialog("Remove from your library?", isPresented: $showingRemovalConfirmation, titleVisibility: .visible) {
+            Button("Remove", role: .destructive, action: removeFromLibrary)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("\u{201C}\(item.title)\u{201D}, its imported file, and its saved artwork will be removed from this device.")
+        }
+        .alert("Couldn’t remove media", isPresented: Binding(get: { removalError != nil }, set: { if !$0 { removalError = nil } })) {
+            Button("OK", role: .cancel) { removalError = nil }
+        } message: {
+            Text(removalError ?? "")
+        }
         .sheet(isPresented: $showingReader) {
             ReadiumBookReader(item: item)
                 .preferredColorScheme(.light)
+        }
+    }
+
+    private func removeFromLibrary() {
+        let removedID = item.id
+        playback.removeFromQueue(itemID: removedID)
+        for playlist in playlists where playlist.itemIDs.contains(removedID) {
+            playlist.itemIDs.removeAll { $0 == removedID }
+        }
+        let localURL = item.localURL
+        let artworkURL = item.artworkURL
+        modelContext.delete(item)
+        do {
+            try modelContext.save()
+            try? FileManager.default.removeItem(at: localURL)
+            if let artworkURL { try? FileManager.default.removeItem(at: artworkURL) }
+            dismiss()
+        } catch {
+            removalError = "The item could not be removed: \(error.localizedDescription)"
         }
     }
 }

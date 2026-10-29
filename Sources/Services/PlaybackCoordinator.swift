@@ -222,6 +222,22 @@ final class PlaybackCoordinator {
         }
     }
 
+    func removeFromQueue(itemID: String) {
+        guard queue.contains(where: { $0.id == itemID }) else { return }
+        if currentItem?.id == itemID {
+            stop()
+            return
+        }
+
+        let currentID = currentItem?.id
+        queue.removeAll { $0.id == itemID }
+        if let currentID, let currentIndex = queue.firstIndex(where: { $0.id == currentID }) {
+            queueIndex = currentIndex
+        } else {
+            queueIndex = min(queueIndex, max(queue.count - 1, 0))
+        }
+    }
+
     func stop() {
         endRemoteSession()
         player.pause()
