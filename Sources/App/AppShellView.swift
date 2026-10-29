@@ -1131,6 +1131,9 @@ private struct JellyfinEntryDetailSheet: View {
     @State private var isStartingPlayback = false
     @State private var gameConfiguration: JellyEmuGameConfiguration?
     @State private var showingGamePlayer = false
+    @State private var albumTracks: [JellyfinLibraryEntry] = []
+    @State private var isLoadingAlbumTracks = false
+    @State private var albumTracksError: String?
 
     private var isFavorite: Bool {
         jellyfin.entries.first(where: { $0.id == item.id })?.isFavorite ?? item.isFavorite
@@ -1156,6 +1159,46 @@ private struct JellyfinEntryDetailSheet: View {
                         .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
                     if !item.overview.isEmpty {
                         Text(item.overview).font(.system(size: 14, design: .rounded)).foregroundStyle(.white.opacity(0.84))
+                    }
+                    if item.isAlbum {
+                        VStack(alignment: .leading, spacing: 9) {
+                            Text("Tracks").font(.system(size: 16, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                            if isLoadingAlbumTracks {
+                                ProgressView("Loading tracks…").tint(MediaPalette.accent)
+                            } else if let albumTracksError {
+                                Text(albumTracksError).font(.system(size: 12, design: .rounded)).foregroundStyle(.red)
+                            } else if albumTracks.isEmpty {
+                                Text("This album has no available tracks.").font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
+                            } else {
+                                ForEach(albumTracks) { track in
+                                    HStack(spacing: 10) {
+                                        MediaArtwork(kind: .music, size: 38, artworkURL: track.imageURL)
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(track.title).font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1)
+                                            Text(track.creator).font(.system(size: 10, design: .rounded)).foregroundStyle(MediaPalette.muted).lineLimit(1)
+                                        }
+                                        Spacer(minLength: 4)
+                                        Button {
+                                            Task {
+                                                isStartingPlayback = true
+                                                let started = await startJellyfinPlayback(track, provider: jellyfin, playback: playback)
+                                                isStartingPlayback = false
+                                                if started {
+                                                    dismiss()
+                                                    onPlaybackStarted()
+                                                }
+                                            }
+                                        } label: {
+                                            Image(systemName: "play.fill").font(.system(size: 12, weight: .semibold)).foregroundStyle(MediaPalette.accent)
+                                                .frame(width: 36, height: 36).background(MediaPalette.surface, in: Circle())
+                                        }
+                                        .disabled(isStartingPlayback)
+                                        .accessibilityLabel("Play \(track.title)")
+                                    }
+                                    .padding(8).background(MediaPalette.surface.opacity(0.65), in: RoundedRectangle(cornerRadius: 13))
+                                }
+                            }
+                        }
                     }
                     Button {
                         Task { await jellyfin.setFavorite(itemID: item.id, isFavorite: !isFavorite) }
@@ -1205,7 +1248,10 @@ private struct JellyfinEntryDetailSheet: View {
                         }
                         .disabled(isStartingPlayback)
                     } else {
-                        Label(item.kind == .book ? "Server books are browse-only here" : "This server item can’t be played here", systemImage: "info.circle")
+                        Label(
+                            item.isAlbum ? "Choose a track above to play" : item.kind == .book ? "Server books are browse-only here" : "This server item can’t be played here",
+                            systemImage: item.isAlbum ? "music.note.list" : "info.circle"
+                        )
                             .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
                             .padding(13).frame(maxWidth: .infinity, alignment: .leading).background(MediaPalette.surface, in: RoundedRectangle(cornerRadius: 14))
                     }
@@ -1221,6 +1267,17 @@ private struct JellyfinEntryDetailSheet: View {
         .fullScreenCover(isPresented: $showingGamePlayer) {
             if let gameConfiguration {
                 JellyEmuGamePlayer(configuration: gameConfiguration)
+            }
+        }
+        .task(id: item.id) {
+            guard item.isAlbum else { return }
+            isLoadingAlbumTracks = true
+            albumTracksError = nil
+            defer { isLoadingAlbumTracks = false }
+            do {
+                albumTracks = try await jellyfin.tracks(in: item)
+            } catch {
+                albumTracksError = "Could not load album tracks: \(error.localizedDescription)"
             }
         }
     }

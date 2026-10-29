@@ -9,6 +9,7 @@ struct JellyfinLibraryEntry: Identifiable, Equatable {
     let title: String
     let creator: String
     let kind: MediaKind
+    let isAlbum: Bool
     let gameSystem: String?
     let overview: String
     let durationSeconds: Double
@@ -153,6 +154,7 @@ final class JellyfinProvider {
                     title: title,
                     creator: creator,
                     kind: kind,
+                    isAlbum: item.type == .musicAlbum,
                     gameSystem: gameSystem,
                     overview: item.overview ?? "",
                     durationSeconds: Double(item.runTimeTicks ?? 0) / 10_000_000,
@@ -167,6 +169,55 @@ final class JellyfinProvider {
         } catch {
             errorMessage = "Could not load items from Jellyfin: \(error.localizedDescription)"
         }
+    }
+
+    func tracks(in album: JellyfinLibraryEntry) async throws -> [JellyfinLibraryEntry] {
+        guard album.isAlbum, let client, let userID else {
+            throw JellyfinProviderError.playbackUnavailable
+        }
+
+        let pageSize = 200
+        var startIndex = 0
+        var tracks: [JellyfinLibraryEntry] = []
+        while true {
+            let parameters = Paths.GetItemsParameters(
+                userID: userID,
+                startIndex: startIndex,
+                limit: pageSize,
+                isRecursive: true,
+                parentID: album.id,
+                fields: [.tags],
+                includeItemTypes: [.audio],
+                enableUserData: true,
+                imageTypeLimit: 1,
+                enableImageTypes: [.primary],
+                enableTotalRecordCount: true,
+                enableImages: true
+            )
+            let response = try await client.send(Paths.getItems(parameters: parameters))
+            let page = response.value.items ?? []
+            tracks.append(contentsOf: page.compactMap { item in
+                guard let id = item.id, let title = item.name else { return nil }
+                return JellyfinLibraryEntry(
+                    id: id,
+                    title: title,
+                    creator: item.albumArtist ?? item.artists?.joined(separator: ", ") ?? album.creator,
+                    kind: .music,
+                    isAlbum: false,
+                    gameSystem: nil,
+                    overview: item.overview ?? "",
+                    durationSeconds: Double(item.runTimeTicks ?? 0) / 10_000_000,
+                    resumeSeconds: Double(item.userData?.playbackPositionTicks ?? 0) / 10_000_000,
+                    isFavorite: item.userData?.isFavorite ?? false,
+                    isPlayable: true,
+                    imageURL: imageURL(for: item, serverURL: client.configuration.url)
+                )
+            })
+            startIndex += page.count
+            guard page.count == pageSize,
+                  response.value.totalRecordCount.map({ startIndex < $0 }) ?? true else { break }
+        }
+        return tracks
     }
 
     func disconnect() async {
