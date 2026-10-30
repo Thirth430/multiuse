@@ -11,6 +11,7 @@
 - [x] Add a shared SwiftData catalog record for local and future provider-backed media.
 - [x] Add document-picker import into the app container for audio, video, EPUB, and CBZ files.
 - [x] Add local search, favorites, recents, and per-category empty states.
+- [x] Surface missing imported files in local media details, disable open/play actions for missing files, and roll back local favorite changes when persistence fails (runner verification pending).
 - [x] Confirm media removal, delete its imported file and artwork after catalog save, remove playlist references and queued entries, and stop it if currently playing.
 - [x] Add AVPlayer-based local audio/video controls and progress checkpoints.
 - [x] Add a manually triggered GitHub Actions workflow and first importer unit tests.

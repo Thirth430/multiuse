@@ -661,15 +661,23 @@ private struct MediaDetailSheet: View {
             Text(item.title).font(.system(size: 24, weight: .bold, design: .rounded)).foregroundStyle(.white)
             Text("\(item.kind.title) · \(item.fileExtension.uppercased()) · \(item.creator.isEmpty ? item.origin : item.creator)")
                 .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
+            if !fileIsAvailable {
+                Label("This imported file is missing. Remove it and import it again to use this item.", systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if item.kind == .music || item.kind == .video {
                 Button(action: play) {
-                    Label("Play", systemImage: "play.fill").font(.system(size: 14, weight: .bold, design: .rounded))
+                    Label(fileIsAvailable ? "Play" : "File unavailable", systemImage: fileIsAvailable ? "play.fill" : "exclamationmark.triangle")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
                         .foregroundStyle(MediaPalette.background).frame(maxWidth: .infinity).padding(14).background(MediaPalette.accent, in: Capsule())
                 }
+                .disabled(!fileIsAvailable)
             } else if item.kind == .game {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("Game file saved", systemImage: "checkmark.circle.fill")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(.green)
+                    Label(fileIsAvailable ? "Game file saved" : "Game file missing", systemImage: fileIsAvailable ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(fileIsAvailable ? .green : .orange)
                     Text("The local catalog recognizes this system, but no compatible emulator core is linked yet.")
                         .font(.system(size: 11, design: .rounded)).foregroundStyle(MediaPalette.muted)
                     Button {} label: {
@@ -688,6 +696,7 @@ private struct MediaDetailSheet: View {
                         .foregroundStyle(MediaPalette.background)
                         .frame(maxWidth: .infinity).padding(14).background(MediaPalette.accent, in: Capsule())
                 }
+                .disabled(!fileIsAvailable)
             }
             HStack {
                 Button(action: toggleFavorite) {
@@ -724,6 +733,10 @@ private struct MediaDetailSheet: View {
             ReadiumBookReader(item: item)
                 .preferredColorScheme(.light)
         }
+    }
+
+    private var fileIsAvailable: Bool {
+        FileManager.default.fileExists(atPath: item.localURL.path)
     }
 
     private func toggleFavorite() {
