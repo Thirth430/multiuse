@@ -99,7 +99,7 @@ private struct JellyEmuWebView: UIViewRepresentable {
         ))
         contentController.add(context.coordinator, contentWorld: .page, name: "jellyEmuSessionEnded")
         contentController.addUserScript(WKUserScript(
-            source: "window.addEventListener('message', function(event) { if (event.data && event.data.type === 'jellyemu-session-end' && window.webkit && window.webkit.messageHandlers.jellyEmuSessionEnded) { window.webkit.messageHandlers.jellyEmuSessionEnded.postMessage('ended'); } });",
+            source: "window.addEventListener('message', function(event) { if (event.source === window && event.origin === window.location.origin && event.data && event.data.type === 'jellyemu-session-end' && window.webkit && window.webkit.messageHandlers.jellyEmuSessionEnded) { window.webkit.messageHandlers.jellyEmuSessionEnded.postMessage('ended'); } });",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         ))
