@@ -611,9 +611,34 @@ private struct MediaArtwork: View {
             .frame(width: size, height: size)
             .task(id: artworkURL) {
                 guard let artworkURL else { image = nil; return }
-                let data = await Task.detached(priority: .utility) { try? Data(contentsOf: artworkURL) }.value
+                let data = await ArtworkDataCache.shared.data(for: artworkURL)
+                guard !Task.isCancelled else { return }
                 image = data.flatMap(UIImage.init(data:))
             }
+    }
+}
+
+private struct RemoteArtwork: View {
+    let kind: MediaKind
+    let url: URL?
+    @State private var image: UIImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image).resizable().scaledToFill()
+            } else {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(MediaPalette.accent.opacity(0.15))
+                    .overlay(Image(systemName: kind.symbol).font(.system(size: 22, weight: .medium)).foregroundStyle(MediaPalette.accent))
+            }
+        }
+        .task(id: url) {
+            guard let url else { image = nil; return }
+            let data = await ArtworkDataCache.shared.data(for: url)
+            guard !Task.isCancelled else { return }
+            image = data.flatMap(UIImage.init(data:))
+        }
     }
 }
 
@@ -1162,15 +1187,7 @@ private struct JellyfinEntryDetailSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    AsyncImage(url: item.imageURL) { phase in
-                        if let image = phase.image {
-                            image.resizable().scaledToFill()
-                        } else {
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(MediaPalette.accent.opacity(0.13))
-                                .overlay(Image(systemName: item.kind.symbol).font(.system(size: 36)).foregroundStyle(MediaPalette.accent))
-                        }
-                    }
+                    RemoteArtwork(kind: item.kind, url: item.imageURL)
                     .frame(maxWidth: .infinity).frame(height: 220).clipShape(RoundedRectangle(cornerRadius: 20))
 
                     Text(item.title).font(.system(size: 25, weight: .bold, design: .rounded)).foregroundStyle(.white)
@@ -1398,14 +1415,7 @@ private struct JellyfinEntryRow: View {
 
     private var rowContent: some View {
             HStack(spacing: 12) {
-                AsyncImage(url: item.imageURL) { phase in
-                    if let image = phase.image {
-                        image.resizable().scaledToFill()
-                    } else {
-                        RoundedRectangle(cornerRadius: 12).fill(MediaPalette.accent.opacity(0.14))
-                            .overlay(Image(systemName: item.kind.symbol).foregroundStyle(MediaPalette.accent))
-                    }
-                }
+                RemoteArtwork(kind: item.kind, url: item.imageURL)
                 .frame(width: 52, height: 52).clipShape(RoundedRectangle(cornerRadius: 12))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(item.title).font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1)

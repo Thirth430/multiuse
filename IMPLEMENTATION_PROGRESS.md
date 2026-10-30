@@ -49,6 +49,7 @@
 - [x] Queue Jellyfin album and playlist tracks in the shared Up Next controls, including next/previous, automatic advance, reordering, and removal.
 - [x] Surface AVPlayer end-of-item playback failures and buffering stalls in the shared playback error state.
 - [x] Send an iOS playback device profile to Jellyfin and prefer its HLS transcode URL when the server reports the source cannot be played directly.
+- [x] Add a shared bounded memory cache for local and remote artwork, backed by URLSession's HTTP cache for server images.
 - [x] Open Jellyfin search results in an in-app detail view with direct playback for playable items and a clear browse-only state for server books.
 - [x] Wire Jellyfin playback-info/stream URLs into the shared AVPlayer and report server playback start, periodic progress, stop, and resume position.
 - [ ] Verify package resolution, authentication, artwork, paginated loading, and network failures with a live Jellyfin server on the GitHub runner/device; revisit a newer SDK pin after upstream compiler compatibility is confirmed.
@@ -58,6 +59,7 @@
 - [ ] Verify Jellyfin collection queue progression, remote controls, reordering, and removal against a live server.
 - [ ] Verify playback error and buffering recovery behavior with unavailable local files and interrupted Jellyfin streams.
 - [ ] Verify Jellyfin chooses direct play or HLS transcoding correctly, including subtitle/audio track selection, against a live server.
+- [ ] Verify shared artwork caching and fallback states across local items, Jellyfin rows, albums, and details.
 - [ ] Verify remote audio/video streaming, resume seeking, Jellyfin session progress/stopped reporting, and transcoded subtitle delivery against a live server.
 
 ## Phase 5 — Video engine decision
@@ -89,4 +91,4 @@
 
 ## Verification policy
 
-This project is being edited on Windows without Xcode or iOS Simulator. The user confirmed the GitHub iOS checkpoint passed on commit `936f09a8090fee1a2d31c72339f478c5842e2372`, including the full-screen video player, then confirmed later checkpoints for Jellyfin pagination (`ca55c2e`), album track browsing (`f682068`), artist album browsing (`5d40a98`), playlist browsing (`808bf2a`), remote album/playlist queue support (`586b42e`), and AVPlayer failure/buffering reporting (current checkout `49ac323`). Local and live-server verification details are still listed separately below. Live game playback still needs a JellyEmu-enabled server and simulator/device verification. Device playback, artwork extraction, reader presentation, video track selection, game UI, and other live Jellyfin behavior also remain runtime checks.
+This project is being edited on Windows without Xcode or iOS Simulator. The user confirmed the GitHub iOS checkpoint passed on commit `936f09a8090fee1a2d31c72339f478c5842e2372`, including the full-screen video player, then confirmed later checkpoints for Jellyfin pagination (`ca55c2e`), album track browsing (`f682068`), artist album browsing (`5d40a98`), playlist browsing (`808bf2a`), remote album/playlist queue support (`586b42e`), AVPlayer failure/buffering reporting (`49ac323`), and iOS playback-profile negotiation with HLS subtitle support (`772858c`). The user also reported the artwork-cache checkpoint passed, but no corresponding commit is reflected in this checkout; the artwork cache remains an uncommitted working-tree change. Local and live-server verification details are still listed separately below. Live game playback still needs a JellyEmu-enabled server and simulator/device verification. Device playback, artwork extraction, reader presentation, video track selection, game UI, and other live Jellyfin behavior also remain runtime checks.
