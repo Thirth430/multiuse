@@ -649,6 +649,7 @@ private struct MediaDetailSheet: View {
     @Query(sort: \MusicPlaylist.updatedAt, order: .reverse) private var playlists: [MusicPlaylist]
     @State private var showingRemovalConfirmation = false
     @State private var removalError: String?
+    @State private var favoriteError: String?
     @State private var showingReader = false
     let item: MediaLibraryRecord
     let play: () -> Void
@@ -689,7 +690,7 @@ private struct MediaDetailSheet: View {
                 }
             }
             HStack {
-                Button { item.isFavorite.toggle(); try? modelContext.save() } label: {
+                Button(action: toggleFavorite) {
                     Label(item.isFavorite ? "Favorited" : "Favorite", systemImage: item.isFavorite ? "heart.fill" : "heart")
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
                 }
@@ -714,9 +715,25 @@ private struct MediaDetailSheet: View {
         } message: {
             Text(removalError ?? "")
         }
+        .alert("Couldn’t save favorite", isPresented: Binding(get: { favoriteError != nil }, set: { if !$0 { favoriteError = nil } })) {
+            Button("OK", role: .cancel) { favoriteError = nil }
+        } message: {
+            Text(favoriteError ?? "")
+        }
         .sheet(isPresented: $showingReader) {
             ReadiumBookReader(item: item)
                 .preferredColorScheme(.light)
+        }
+    }
+
+    private func toggleFavorite() {
+        let previousValue = item.isFavorite
+        item.isFavorite.toggle()
+        do {
+            try modelContext.save()
+        } catch {
+            item.isFavorite = previousValue
+            favoriteError = "Your favorite change wasn’t saved: \(error.localizedDescription)"
         }
     }
 
