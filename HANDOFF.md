@@ -13,9 +13,10 @@ Continue the user's project autonomously from this checkout. Read this file, `IM
 - Repository: `C:\Users\elias\Desktop\multiuse\multiuse`
 - Remote: `https://github.com/Thirth430/multiuse.git`
 - Branch: `main`
-- Last observed `HEAD`: `7eee169b5c45efe62de872ab75ca6e06cf986911`
+- Last observed `HEAD`: `789a70dab095463220fe3a20fd17939f958e4cb7`
 - The user confirmed the artwork-cache checkpoint passed; this commit contains the handoff, `Sources/Services/ArtworkDataCache.swift`, and artwork view changes.
-- Current working tree: `Sources/Features/JellyEmuGamePlayer.swift` modified for the token-scope fix described below. It has not yet been runner-verified.
+- The user confirmed the JellyEmu main-frame token/message scoping checkpoint passed in commit `789a70d` and reported success for the subsequent configured-origin guard. Local `HEAD` remains `789a70d`, so the latter result has no commit association visible in this checkout.
+- Current working tree contains the configured-origin guard and related handoff/progress updates; check `git status` before editing.
 - Other checked-out source projects live in the parent folder: `Fast-Font`, `JellyEmu`, `jellyfin-sdk-swift`, `localmusic`, `MPVKit`, `retroarch`, and `swift-toolkit` (Readium).
 - The session has no Xcode or iOS Simulator. `git diff --check` passed for tracked edits at the last check. It does not compile Swift and does not include the untracked file in its output.
 - Manual CI: `.github/workflows/ios-checkpoint.yml` (`workflow_dispatch`, `macos-latest`, latest-stable Xcode, XcodeGen, `xcodebuild test` on an available iPhone simulator). Ask the user to push and run it after the current edits. The workflow does not test against a live Jellyfin server.
@@ -74,7 +75,8 @@ The authoritative granular checklist is `IMPLEMENTATION_PROGRESS.md`; source cap
 - Server playback reports start/progress/stop and uses a posted iOS playback device profile with direct-play capabilities plus HLS video/audio fallback and subtitle manifest support. HLS transcoding URL is normalized to the configured server origin/base path; incompatible/missing transcode URL reports an error.
 - AVPlayer handles server and local streams, shows audio/subtitle selections when AVFoundation exposes them, and surfaces item failures/buffering.
 - JellyEmu source is MIT C#/.NET 9/Jellyfin 10.11 server plugin. The app recognizes its `Book` + `JellyEmu` tag convention and loads `/jellyemu/play/{itemId}` in WKWebView with the expected token hook. It is not an embedded emulator and needs live-server/device verification.
-- The token user script is now limited to the main document; WebKit session-end messages from subframes are ignored. This security hardening still needs runner build and live plugin validation.
+- At `789a70d`, the token user script was limited to the main document and WebKit session-end messages from subframes were ignored. The current unverified patch also checks the configured server origin before exposing/accepting the token/session message.
+- JellyEmu `ejs.html` posts its session-end message after its session-stop and playtime requests settle, but those requests catch failures, so the message does not prove the server persisted them. The template reads an `autosave` preference on exit but does not visibly call the save-state callback in that exit function; do not claim save-on-exit until verified.
 
 ### Video decision
 
@@ -111,15 +113,17 @@ Known checkpoint references captured in progress notes:
 - `586b42e`: remote album/playlist queue checkpoint.
 - `49ac323`: AVPlayer failure/buffering reporting checkpoint.
 - `772858c`: Jellyfin posted playback profile/HLS subtitle support checkpoint.
+- `789a70d`: JellyEmu main-frame-only token injection and subframe session-end rejection checkpoint.
 - Artwork-cache result was reported as successful and the checkout now contains it at `7eee169`.
 
 ## Prioritized work remaining
 
 ### Immediate
 
-1. Push and run the GitHub iOS workflow for the JellyEmu main-frame token/message scoping change in `Sources/Features/JellyEmuGamePlayer.swift`; fix any compile/test error the user reports.
-2. With a JellyEmu-enabled server, verify that the top-level page still authenticates and that a subframe cannot trigger session dismissal. The runner does not cover this runtime behavior.
-3. Keep `HANDOFF.md` and `IMPLEMENTATION_PROGRESS.md` in sync after the result.
+1. Reconcile the user's configured-origin guard success with the local checkout; current `HEAD` still reads `789a70d`. Preserve the working changes and verify the pushed commit when available.
+2. Push and run the GitHub iOS workflow for the JellyEmu origin guard/session-close changes; fix any compile/test error the user reports.
+3. With a JellyEmu-enabled server, verify the configured top-level page authenticates, external navigation receives no token, subframes cannot end sessions, and a delayed/missing end confirmation exposes the force-close action. The runner does not cover these runtime behaviors.
+4. Keep `HANDOFF.md` and `IMPLEMENTATION_PROGRESS.md` synchronized after each result.
 
 ### Functional verification on a live Jellyfin server/device
 
@@ -165,5 +169,8 @@ See `ARCHITECTURE.md` for the full integration assessment and compatibility note
 ## Activity log
 
 - 2026-10-29: User confirmed the Jellyfin playback-profile/HLS-subtitle checkpoint passed. Added shared artwork cache and replaced remote AsyncImage call sites; user confirmed success, and the checkout advanced to `7eee169`, which contains the cache and handoff.
-- 2026-10-29: Restricted JellyEmu's token hook to the top-level document and ignored script messages from subframes after inspecting JellyEmu templates. This change is unbuilt/unverified; ask the user to run GitHub CI after it is pushed.
+- 2026-10-29: Restricted JellyEmu's token hook to the top-level document and ignored script messages from subframes after inspecting JellyEmu templates; the user confirmed the runner pass at `789a70d`.
+- 2026-10-29: Found that the main-frame token script also runs after any top-level navigation. Added a configured-origin guard and same-origin validation for session messages; this change is unbuilt/unverified pending the next GitHub checkpoint.
+- 2026-10-29: User reported success for the configured-origin guard, but local `HEAD` remained `789a70d`; record the pass without assigning it to an unseen commit. JellyEmu template review showed its session-end message follows stop/playtime request settlement, although request failures are caught. The app's old five-second dismissal could interrupt those requests.
+- 2026-10-29: Replaced the unconditional five-second auto-dismiss with a 12-second wait for JellyEmu's session-end message, followed by a clearly labeled force-close option. This change is unbuilt/unverified.
 - Future agents: append a dated bullet for each meaningful implementation/test/architecture update and refresh the snapshot and immediate next action above.

@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import WebKit
 
@@ -8,6 +9,8 @@ struct JellyEmuGamePlayer: View {
     let configuration: JellyEmuGameConfiguration
     @State private var isClosing = false
     @State private var sessionEnded = false
+    @State private var showingForceClose = false
+    @State private var closeTimeoutTask: Task<Void, Never>?
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -25,20 +28,51 @@ struct JellyEmuGamePlayer: View {
             .padding(.top, 12)
             .padding(.trailing, 14)
             .disabled(isClosing)
+            if isClosing {
+                VStack(spacing: 9) {
+                    ProgressView().tint(.white)
+                    Text("Closing game and ending server session…")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                    if showingForceClose {
+                        Text("The server has not confirmed that this game session is closed.")
+                            .font(.system(size: 11, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.75))
+                            .multilineTextAlignment(.center)
+                        Button("Close anyway", role: .destructive) {
+                            closeTimeoutTask?.cancel()
+                            dismiss()
+                        }
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                    }
+                }
+                .padding(16)
+                .frame(maxWidth: 300)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, 38)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
         .preferredColorScheme(.dark)
         .onChange(of: sessionEnded) { _, ended in
-            if ended { dismiss() }
+            if ended {
+                closeTimeoutTask?.cancel()
+                dismiss()
+            }
         }
+        .onDisappear { closeTimeoutTask?.cancel() }
     }
 
     private func closePlayer() {
         guard !isClosing else { return }
         isClosing = true
         // Ask JellyEmu to stop its session and flush playtime before dismissal.
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(5))
-            if !sessionEnded { dismiss() }
+        closeTimeoutTask = Task { @MainActor in
+            do { try await Task.sleep(for: .seconds(12)) }
+            catch { return }
+            guard !sessionEnded else { return }
+            withAnimation(.easeInOut(duration: 0.2)) { showingForceClose = true }
         }
     }
 }
@@ -51,12 +85,13 @@ private struct JellyEmuWebView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         context.coordinator.onSessionEnded = { sessionEnded = true }
+        context.coordinator.allowedOrigin = jellyEmuOrigin(configuration.playURL)
         let contentController = WKUserContentController()
         let tokenLiteral = (try? JSONSerialization.data(
-            withJSONObject: [configuration.accessToken],
+            withJSONObject: [configuration.accessToken, context.coordinator.allowedOrigin ?? ""],
             options: [.fragmentsAllowed]
-        )).flatMap { String(data: $0, encoding: .utf8) } ?? "[\"\"]"
-        let tokenScript = "window.JellyEmu = window.JellyEmu || {}; window.JellyEmu.getAuthToken = function(){ return \(tokenLiteral)[0]; };"
+        )).flatMap { String(data: $0, encoding: .utf8) } ?? "[\"\",\"\"]"
+        let tokenScript = "(function(){const values = \(tokenLiteral); if (window.location.origin !== values[1]) { return; } window.JellyEmu = window.JellyEmu || {}; window.JellyEmu.getAuthToken = function(){ return values[0]; };})();"
         contentController.addUserScript(WKUserScript(
             source: tokenScript,
             injectionTime: .atDocumentStart,
@@ -92,9 +127,13 @@ private struct JellyEmuWebView: UIViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, WKScriptMessageHandler {
         var didRequestExit = false
+        var allowedOrigin: String?
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard message.name == "jellyEmuSessionEnded", message.frameInfo.isMainFrame else { return }
+            guard let allowedOrigin,
+                  message.name == "jellyEmuSessionEnded",
+                  message.frameInfo.isMainFrame,
+                  jellyEmuOrigin(message.frameInfo.request.url) == allowedOrigin else { return }
             didRequestExit = true
             // The representable's binding is updated through the owner callback.
             onSessionEnded?()
@@ -102,4 +141,17 @@ private struct JellyEmuWebView: UIViewRepresentable {
 
         var onSessionEnded: (() -> Void)?
     }
+}
+
+private func jellyEmuOrigin(_ url: URL?) -> String? {
+    guard let url, var components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+          let scheme = components.scheme?.lowercased(), ["http", "https"].contains(scheme), components.host != nil else { return nil }
+    components.scheme = scheme
+    components.host = components.host?.lowercased()
+    let defaultPort = scheme == "https" ? 443 : scheme == "http" ? 80 : nil
+    if components.port == defaultPort { components.port = nil }
+    components.path = ""
+    components.query = nil
+    components.fragment = nil
+    return components.string?.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 }
