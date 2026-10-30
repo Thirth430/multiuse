@@ -13,8 +13,9 @@ Continue the user's project autonomously from this checkout. Read this file, `IM
 - Repository: `C:\Users\elias\Desktop\multiuse\multiuse`
 - Remote: `https://github.com/Thirth430/multiuse.git`
 - Branch: `main`
-- Last observed `HEAD`: `772858cf50cb9482ba8590acf902bdb4243e1e50`
-- Current working tree at handoff: `IMPLEMENTATION_PROGRESS.md` and `Sources/App/AppShellView.swift` modified; `HANDOFF.md` and `Sources/Services/ArtworkDataCache.swift` untracked. The implementation changes are the artwork-cache work described below. None of these working-tree changes are represented by the observed HEAD commit.
+- Last observed `HEAD`: `7eee169b5c45efe62de872ab75ca6e06cf986911`
+- The user confirmed the artwork-cache checkpoint passed; this commit contains the handoff, `Sources/Services/ArtworkDataCache.swift`, and artwork view changes.
+- Current working tree: `Sources/Features/JellyEmuGamePlayer.swift` modified for the token-scope fix described below. It has not yet been runner-verified.
 - Other checked-out source projects live in the parent folder: `Fast-Font`, `JellyEmu`, `jellyfin-sdk-swift`, `localmusic`, `MPVKit`, `retroarch`, and `swift-toolkit` (Readium).
 - The session has no Xcode or iOS Simulator. `git diff --check` passed for tracked edits at the last check. It does not compile Swift and does not include the untracked file in its output.
 - Manual CI: `.github/workflows/ios-checkpoint.yml` (`workflow_dispatch`, `macos-latest`, latest-stable Xcode, XcodeGen, `xcodebuild test` on an available iPhone simulator). Ask the user to push and run it after the current edits. The workflow does not test against a live Jellyfin server.
@@ -73,6 +74,7 @@ The authoritative granular checklist is `IMPLEMENTATION_PROGRESS.md`; source cap
 - Server playback reports start/progress/stop and uses a posted iOS playback device profile with direct-play capabilities plus HLS video/audio fallback and subtitle manifest support. HLS transcoding URL is normalized to the configured server origin/base path; incompatible/missing transcode URL reports an error.
 - AVPlayer handles server and local streams, shows audio/subtitle selections when AVFoundation exposes them, and surfaces item failures/buffering.
 - JellyEmu source is MIT C#/.NET 9/Jellyfin 10.11 server plugin. The app recognizes its `Book` + `JellyEmu` tag convention and loads `/jellyemu/play/{itemId}` in WKWebView with the expected token hook. It is not an embedded emulator and needs live-server/device verification.
+- The token user script is now limited to the main document; WebKit session-end messages from subframes are ignored. This security hardening still needs runner build and live plugin validation.
 
 ### Video decision
 
@@ -82,7 +84,7 @@ The authoritative granular checklist is `IMPLEMENTATION_PROGRESS.md`; source cap
 ### Current artwork-cache change
 
 - `Sources/Services/ArtworkDataCache.swift` adds a bounded shared NSCache memory cache. File URLs load off the main actor; remote URLs use URLSession and its HTTP cache. `MediaArtwork` uses it for local/remote art; Jellyfin detail and row art now use `RemoteArtwork` instead of direct AsyncImage.
-- The user most recently reported “Success” after being asked to push/run the artwork checkpoint. However, current observed Git state remains at `772858c` with these artwork edits dirty/untracked. Treat the test result as user-reported but do not claim the currently observed commit contains it. Ask/confirm current runner commit if needed, or have the user run after pushing these files.
+- The user most recently reported “Success” after being asked to push/run the artwork checkpoint. The current checkout advanced to `7eee169`, which contains the shared cache and image view changes.
 - No local Xcode build was possible. The last `git diff --check` passed for tracked edits.
 
 ## Checkpoint and failure history
@@ -109,14 +111,15 @@ Known checkpoint references captured in progress notes:
 - `586b42e`: remote album/playlist queue checkpoint.
 - `49ac323`: AVPlayer failure/buffering reporting checkpoint.
 - `772858c`: Jellyfin posted playback profile/HLS subtitle support checkpoint.
-- Artwork-cache result was reported as successful, but the checkout did not advance beyond `772858c`; source remains dirty as described above.
+- Artwork-cache result was reported as successful and the checkout now contains it at `7eee169`.
 
 ## Prioritized work remaining
 
 ### Immediate
 
-1. Reconcile the reported artwork-cache CI success with Git. Current `HEAD` is `772858cf50cb9482ba8590acf902bdb4243e1e50`; working tree has two modified tracked files and a new untracked cache source. Do not discard them. Make sure the actual GitHub checkpoint included this file; if not, ask the user to push/run it. Fix any reported Swift 6 concurrency or `NSCache` errors.
-2. Keep `HANDOFF.md` and `IMPLEMENTATION_PROGRESS.md` in sync after the above result.
+1. Push and run the GitHub iOS workflow for the JellyEmu main-frame token/message scoping change in `Sources/Features/JellyEmuGamePlayer.swift`; fix any compile/test error the user reports.
+2. With a JellyEmu-enabled server, verify that the top-level page still authenticates and that a subframe cannot trigger session dismissal. The runner does not cover this runtime behavior.
+3. Keep `HANDOFF.md` and `IMPLEMENTATION_PROGRESS.md` in sync after the result.
 
 ### Functional verification on a live Jellyfin server/device
 
@@ -161,5 +164,6 @@ See `ARCHITECTURE.md` for the full integration assessment and compatibility note
 
 ## Activity log
 
-- 2026-10-29: User confirmed the Jellyfin playback-profile/HLS-subtitle checkpoint passed. Added shared artwork cache and replaced remote AsyncImage call sites. User then reported the artwork-cache checkpoint passed. Current checkout still shows the artwork implementation as dirty/untracked at HEAD `772858c`; reconcile the runner commit before claiming that exact tree is verified. Created this handoff at the user's request.
+- 2026-10-29: User confirmed the Jellyfin playback-profile/HLS-subtitle checkpoint passed. Added shared artwork cache and replaced remote AsyncImage call sites; user confirmed success, and the checkout advanced to `7eee169`, which contains the cache and handoff.
+- 2026-10-29: Restricted JellyEmu's token hook to the top-level document and ignored script messages from subframes after inspecting JellyEmu templates. This change is unbuilt/unverified; ask the user to run GitHub CI after it is pushed.
 - Future agents: append a dated bullet for each meaningful implementation/test/architecture update and refresh the snapshot and immediate next action above.

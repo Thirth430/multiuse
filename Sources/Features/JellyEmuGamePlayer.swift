@@ -60,7 +60,7 @@ private struct JellyEmuWebView: UIViewRepresentable {
         contentController.addUserScript(WKUserScript(
             source: tokenScript,
             injectionTime: .atDocumentStart,
-            forMainFrameOnly: false
+            forMainFrameOnly: true
         ))
         contentController.add(context.coordinator, contentWorld: .page, name: "jellyEmuSessionEnded")
         contentController.addUserScript(WKUserScript(
@@ -94,7 +94,7 @@ private struct JellyEmuWebView: UIViewRepresentable {
         var didRequestExit = false
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard message.name == "jellyEmuSessionEnded" else { return }
+            guard message.name == "jellyEmuSessionEnded", message.frameInfo.isMainFrame else { return }
             didRequestExit = true
             // The representable's binding is updated through the owner callback.
             onSessionEnded?()
