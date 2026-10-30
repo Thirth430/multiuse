@@ -53,7 +53,6 @@ Maintain a third-party notices bundle with exact versions, copyright notices, li
 5. Adapt local music services and prove import, play, queue and progress behavior.
 6. Select a video backend only after its format coverage and license/binary footprint are approved; implement subtitle/audio track selection and resume position.
 7. Prototype an iOS statically linked Libretro runtime using a separately sourced core. mGBA is a candidate for GB/GBC/GBA because it is MPL-2.0 and appears in Libretro-super iOS recipes; its source implements the Libretro save-state serialization functions. First verify a static iOS build, transitive licenses, and source-distribution obligations. The available RetroArch checkout supplies only its GPL-3.0 frontend and ABI header.
-8. Consider the cross-media 2D collection experience after core import, browse and playback/read paths work.
 
 ## Open verification items
 

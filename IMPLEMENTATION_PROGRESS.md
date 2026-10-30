@@ -74,7 +74,7 @@
 - [ ] Review MPVKit binary provenance, transitive licenses, distribution size, and thermal behavior.
 - [ ] Decide whether MPVKit's LGPL product is needed for formats AVPlayer cannot play, then validate its iOS integration and distribution costs.
 
-## Phase 6 — Retro games and optional signature feature
+## Phase 6 — Retro games
 
 - [x] Import local game files for the listed cartridge and disc image extensions, identify the associated system, and use shared favorites/search/catalog details.
 - [x] Clearly mark game launch unavailable until a suitable licensed and iOS-compatible core runtime is linked.
@@ -91,7 +91,6 @@
 - [ ] Verify Jellyfin favorite toggling and restored favorite state against a live server.
 - [ ] Audit EmulatorJS and emulator core licenses/provenance independently from JellyEmu's MIT license.
 - [ ] Implement controller mapping, save paths, favorites, and game metadata without bundling copyrighted game content.
-- [ ] Prototype the cross-media 2D collection experience after core media paths are usable.
 
 ## Verification policy
 
