@@ -4,6 +4,7 @@ import ReadiumShared
 import ReadiumStreamer
 import SwiftUI
 import UIKit
+import ImageIO
 
 private extension FontFamily {
     static let fastSerif: FontFamily = "Fast Serif"
@@ -265,7 +266,7 @@ private struct CBZComicReader: View {
     let onLocationChange: (Locator) -> Void
 
     @State private var pageIndex = 0
-    @State private var pageData: Data?
+    @State private var pageImage: UIImage?
     @State private var errorMessage: String?
     @State private var didRestoreLocation = false
 
@@ -274,8 +275,8 @@ private struct CBZComicReader: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            if let pageData, let image = UIImage(data: pageData) {
-                Image(uiImage: image)
+            if let pageImage {
+                Image(uiImage: pageImage)
                     .resizable()
                     .scaledToFit()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -336,13 +337,26 @@ private struct CBZComicReader: View {
             errorMessage = "This comic archive contains no readable image pages."
             return
         }
-        pageData = nil
+        pageImage = nil
         errorMessage = nil
         do {
             guard let resource = publication.get(pages[pageIndex]) else {
                 throw ComicReaderError.missingPage
             }
-            pageData = try await resource.read().get()
+            let data = try await resource.read().get()
+            guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
+                  let image = CGImageSourceCreateThumbnailAtIndex(
+                    imageSource,
+                    0,
+                    [
+                        kCGImageSourceCreateThumbnailFromImageAlways: true,
+                        kCGImageSourceThumbnailMaxPixelSize: 2800,
+                        kCGImageSourceShouldCacheImmediately: true,
+                    ] as CFDictionary
+                  ) else {
+                throw ComicReaderError.unsupportedPage
+            }
+            pageImage = UIImage(cgImage: image)
             guard let mediaType = pages[pageIndex].mediaType else { throw ComicReaderError.unsupportedPage }
             let progression = Double(pageIndex) / Double(max(1, pages.count))
             let locator = Locator(

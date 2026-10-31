@@ -38,6 +38,7 @@
 - [x] Add Readium EPUB navigation, saved locators, bookmarks, table of contents, and font-size controls.
 - [x] Add CBZ parsing with an app-owned page navigator over Readium's image resources (no CBZ navigator implementation exists in the checked-out source), including saved-page restoration and bookmark navigation.
 - [x] Add horizontal swipe navigation to the CBZ reader while retaining visible previous/next controls (runner verification pending).
+- [x] Downsample CBZ page images to a 2800-pixel maximum dimension before display to reduce peak decoded-image memory use (runner verification pending).
 - [x] Include the MIT-licensed Fast Serif face as an optional reader font.
 - [ ] Verify EPUB/CBZ rendering, restored positions, bookmarks, and font injection on the GitHub iOS simulator.
 - [ ] Retain the verified CBR limitation unless a separate implementation is selected.
