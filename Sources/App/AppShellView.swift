@@ -367,7 +367,11 @@ struct AppShellView: View {
                             }
                             Button("Delete playlist", systemImage: "trash", role: .destructive) {
                                 modelContext.delete(playlist)
-                                try? modelContext.save()
+                                do { try modelContext.save() }
+                                catch {
+                                    modelContext.insert(playlist)
+                                    alertMessage = "The playlist could not be deleted: \(error.localizedDescription)"
+                                }
                             }
                         } label: {
                             Image(systemName: "ellipsis").font(.system(size: 14, weight: .semibold)).foregroundStyle(MediaPalette.muted)
@@ -1541,6 +1545,7 @@ private struct MusicPlaylistDetailSheet: View {
     let tracks: [MediaLibraryRecord]
     let play: ([MediaLibraryRecord], Int) -> Void
     @State private var orderedIDs: [String]
+    @State private var persistenceError: String?
 
     init(playlist: MusicPlaylist, tracks: [MediaLibraryRecord], play: @escaping ([MediaLibraryRecord], Int) -> Void) {
         self.playlist = playlist
@@ -1575,9 +1580,15 @@ private struct MusicPlaylistDetailSheet: View {
                             .buttonStyle(.plain)
                         }
                         .onMove { source, destination in
+                            let previousIDs = orderedIDs
                             orderedIDs.move(fromOffsets: source, toOffset: destination)
                             playlist.itemIDs = orderedIDs
-                            try? modelContext.save()
+                            do { try modelContext.save() }
+                            catch {
+                                orderedIDs = previousIDs
+                                playlist.itemIDs = previousIDs
+                                persistenceError = "The playlist order could not be saved: \(error.localizedDescription)"
+                            }
                         }
                     }
                 } header: {
@@ -1600,6 +1611,14 @@ private struct MusicPlaylistDetailSheet: View {
             }
         }
         .preferredColorScheme(.dark)
+        .alert("Couldn’t update playlist", isPresented: Binding(
+            get: { persistenceError != nil },
+            set: { if !$0 { persistenceError = nil } }
+        )) {
+            Button("OK", role: .cancel) { persistenceError = nil }
+        } message: {
+            Text(persistenceError ?? "")
+        }
     }
 }
 
