@@ -19,6 +19,7 @@
 - [x] Adapt LocalMusic metadata tags and embedded artwork into shared records and artwork rendering; extend import recognition to FLAC and Opus.
 - [x] Add a shared playback queue, previous/next controls, lock-screen/remote commands, now-playing metadata, audio interruption handling, and headphone-removal pause behavior.
 - [x] Stop and clear any previous playback session when a selected local media file is missing before presenting the unavailable-file error (runner verification pending).
+- [x] Stop and clear stale playback if AVAudioSession activation fails while starting a replacement item (runner verification pending).
 - [x] Add an Up Next panel to the player with queue selection, reordering, and removal controls.
 - [x] Add persistent local music playlists with create/edit/delete, reorderable track membership, playlist browsing, and playlist queue playback.
 - [x] Restore the prior playlist order and surface an error when saving a reorder fails; restore a deleted playlist in the view context when deletion cannot be saved (runner verification pending).

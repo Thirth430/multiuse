@@ -126,6 +126,7 @@ final class PlaybackCoordinator {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
+            stop()
             errorMessage = "Audio playback could not start: \(error.localizedDescription)"
             return false
         }
