@@ -42,6 +42,7 @@
 
 - [x] Add Readium Shared, Streamer, and Navigator from the checked-out revision through a pinned Swift package dependency.
 - [x] Add Readium EPUB navigation, saved locators, bookmarks, table of contents, and font-size controls.
+- [x] Explicitly save EPUB/CBZ reading positions and bookmark changes through SwiftData and surface persistence errors (runner verification pending).
 - [x] Offer retry actions after EPUB opening or CBZ page-loading failures (runner verification pending).
 - [x] Avoid creating duplicate reader bookmarks for the exact same saved location (runner verification pending).
 - [x] Add editable bookmark-list deletion for EPUB and CBZ saved positions (runner verification pending).

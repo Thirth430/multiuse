@@ -119,6 +119,7 @@ private final class ReadiumReaderSession {
 
 struct ReadiumBookReader: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
     @State private var session: ReadiumReaderSession
     @State private var navigator: EPUBNavigatorViewController?
     @AppStorage("reader.fontChoice") private var fontChoice = "system"
@@ -142,14 +143,14 @@ struct ReadiumBookReader: View {
                             item: session.item,
                             initialLocation: session.currentLocator,
                             navigationRequest: comicNavigationRequest
-                        ) { session.update(location: $0) }
+                        ) { updateReadingLocation($0) }
                     } else {
                         ReadiumNavigatorContainer(
                             publication: publication,
                             initialLocation: session.currentLocator,
                             fontFamily: selectedFontFamily,
                             fontSize: fontSize,
-                            onLocationChange: session.update,
+                            onLocationChange: updateReadingLocation,
                             onError: { navigationError = $0.localizedDescription },
                             onReady: { navigator = $0 }
                         )
@@ -185,7 +186,10 @@ struct ReadiumBookReader: View {
                         .accessibilityLabel("Table of contents")
                     }
                     Menu {
-                        Button("Add bookmark", systemImage: "bookmark") { session.addBookmark() }
+                        Button("Add bookmark", systemImage: "bookmark") {
+                            session.addBookmark()
+                            persistReadingState()
+                        }
                         Button("Bookmarks", systemImage: "bookmark.fill") { showingBookmarks = true }
                         Divider()
                         if session.publication?.conforms(to: .epub) == true {
@@ -219,6 +223,16 @@ struct ReadiumBookReader: View {
 
     private var selectedFontFamily: FontFamily {
         fontChoice == "fast" ? .fastSerif : .serif
+    }
+
+    private func updateReadingLocation(_ location: Locator) {
+        session.update(location: location)
+        persistReadingState()
+    }
+
+    private func persistReadingState() {
+        do { try modelContext.save() }
+        catch { navigationError = "Your reading position or bookmarks could not be saved: \(error.localizedDescription)" }
     }
 
     private var contentsSheet: some View {
@@ -257,7 +271,10 @@ struct ReadiumBookReader: View {
                     }
                     .foregroundStyle(.primary)
                 }
-                .onDelete(perform: session.removeBookmarks)
+                .onDelete { offsets in
+                    session.removeBookmarks(at: offsets)
+                    persistReadingState()
+                }
             }
             .overlay {
                 if session.bookmarks.isEmpty {
