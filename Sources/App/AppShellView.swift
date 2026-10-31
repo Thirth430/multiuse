@@ -671,6 +671,7 @@ private struct MediaDetailSheet: View {
     @Query(sort: \MusicPlaylist.updatedAt, order: .reverse) private var playlists: [MusicPlaylist]
     @State private var showingRemovalConfirmation = false
     @State private var removalError: String?
+    @State private var removalDidCommit = false
     @State private var favoriteError: String?
     @State private var showingReader = false
     let item: MediaLibraryRecord
@@ -741,8 +742,11 @@ private struct MediaDetailSheet: View {
         } message: {
             Text("\u{201C}\(item.title)\u{201D}, its imported file, and its saved artwork will be removed from this device.")
         }
-        .alert("Couldn’t remove media", isPresented: Binding(get: { removalError != nil }, set: { if !$0 { removalError = nil } })) {
-            Button("OK", role: .cancel) { removalError = nil }
+        .alert(removalDidCommit ? "Removed with cleanup issue" : "Couldn’t remove media", isPresented: Binding(get: { removalError != nil }, set: { if !$0 { removalError = nil } })) {
+            Button("OK", role: .cancel) {
+                removalError = nil
+                if removalDidCommit { dismiss() }
+            }
         } message: {
             Text(removalError ?? "")
         }
@@ -774,8 +778,8 @@ private struct MediaDetailSheet: View {
 
     private func removeFromLibrary() {
         let removedID = item.id
-        playback.removeFromQueue(itemID: removedID)
-        for playlist in playlists where playlist.itemIDs.contains(removedID) {
+        let affectedPlaylists = playlists.filter { $0.itemIDs.contains(removedID) }.map { ($0, $0.itemIDs) }
+        for (playlist, _) in affectedPlaylists {
             playlist.itemIDs.removeAll { $0 == removedID }
         }
         let localURL = item.localURL
@@ -783,10 +787,29 @@ private struct MediaDetailSheet: View {
         modelContext.delete(item)
         do {
             try modelContext.save()
-            try? FileManager.default.removeItem(at: localURL)
-            if let artworkURL { try? FileManager.default.removeItem(at: artworkURL) }
-            dismiss()
+            playback.removeFromQueue(itemID: removedID)
+            var cleanupFailures: [String] = []
+            if FileManager.default.fileExists(atPath: localURL.path) {
+                do { try FileManager.default.removeItem(at: localURL) }
+                catch { cleanupFailures.append("media file") }
+            }
+            if let artworkURL {
+                if FileManager.default.fileExists(atPath: artworkURL.path) {
+                    do { try FileManager.default.removeItem(at: artworkURL) }
+                    catch { cleanupFailures.append("artwork") }
+                }
+            }
+            if cleanupFailures.isEmpty {
+                dismiss()
+            } else {
+                removalDidCommit = true
+                removalError = "The item was removed from your library, but its \(cleanupFailures.joined(separator: " and ")) could not be deleted from this device."
+            }
         } catch {
+            modelContext.insert(item)
+            for (playlist, previousIDs) in affectedPlaylists {
+                playlist.itemIDs = previousIDs
+            }
             removalError = "The item could not be removed: \(error.localizedDescription)"
         }
     }
