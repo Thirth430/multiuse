@@ -261,7 +261,7 @@ struct AppShellView: View {
                     Text("Continue on Jellyfin")
                         .font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.white)
                     ForEach(continueServerItems.prefix(5)) { item in
-                        JellyfinEntryRow(item: item) { selectedContinueServerEntry = item }
+                        JellyfinEntryRow(item: item) { selectedHomeServerEntry = item }
                     }
                 }
             }
