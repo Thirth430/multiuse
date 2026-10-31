@@ -69,6 +69,7 @@
 - [x] Add a shared bounded memory cache for local and remote artwork, backed by URLSession's HTTP cache for server images.
 - [x] Open Jellyfin search results in an in-app detail view with direct playback for playable items and a clear browse-only state for server books.
 - [x] Wire Jellyfin playback-info/stream URLs into the shared AVPlayer and report server playback start, periodic progress, stop, and resume position.
+- [x] Surface unfinished Jellyfin music/video items on Home using saved resume positions and last-played timestamps (runner and live-server verification pending).
 - [ ] Verify package resolution, authentication, artwork, paginated loading, and network failures with a live Jellyfin server on the GitHub runner/device; revisit a newer SDK pin after upstream compiler compatibility is confirmed.
 - [ ] Verify Jellyfin album track listing and selected-track playback against a live server.
 - [ ] Verify Jellyfin artist album browsing against a live server.

@@ -63,6 +63,7 @@ struct AppShellView: View {
     @State private var selectedPlaylist: MusicPlaylist?
     @State private var selectedMusicCollection: MusicCollectionSelection?
     @State private var selectedServerEntry: JellyfinLibraryEntry?
+    @State private var selectedContinueServerEntry: JellyfinLibraryEntry?
     @State private var selectedItem: MediaLibraryRecord?
     @State private var showingDetail = false
     @State private var alertMessage: String?
@@ -104,6 +105,11 @@ struct AppShellView: View {
         .sheet(isPresented: $showingSearch) { searchSheet }
         .sheet(isPresented: $showingSettings) { SettingsSheet() }
         .sheet(isPresented: $showingPlayer) { NowPlayingSheet(showingFullscreenVideo: $showingFullscreenVideo) }
+        .sheet(item: $selectedContinueServerEntry) { item in
+            JellyfinEntryDetailSheet(item: item) {
+                openPlayback(for: item.kind)
+            }
+        }
         .fullScreenCover(isPresented: $showingFullscreenVideo) { FullScreenVideoPlayer() }
         .sheet(isPresented: $showingJellyfinLibrary) {
             JellyfinLibrarySheet { kind in openPlayback(for: kind, closingJellyfinLibrary: true) }
@@ -247,6 +253,16 @@ struct AppShellView: View {
                 }
             }
 
+            if !continueServerItems.isEmpty {
+                VStack(alignment: .leading, spacing: 13) {
+                    Text("Continue on Jellyfin")
+                        .font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                    ForEach(continueServerItems.prefix(5)) { item in
+                        JellyfinEntryRow(item: item) { selectedContinueServerEntry = item }
+                    }
+                }
+            }
+
             if items.isEmpty { emptyLibrary }
             else {
                 VStack(alignment: .leading, spacing: 13) {
@@ -272,6 +288,15 @@ struct AppShellView: View {
             }
         }
         .sorted { ($0.lastOpenedAt ?? .distantPast) > ($1.lastOpenedAt ?? .distantPast) }
+    }
+
+    private var continueServerItems: [JellyfinLibraryEntry] {
+        guard jellyfin.isConnected else { return [] }
+        return jellyfin.entries.filter { item in
+            guard (item.kind == .music || item.kind == .video), item.isPlayable, item.resumeSeconds > 15 else { return false }
+            return item.durationSeconds <= 0 || item.resumeSeconds < item.durationSeconds - 15
+        }
+        .sorted { ($0.lastPlayedAt ?? .distantPast) > ($1.lastPlayedAt ?? .distantPast) }
     }
 
     private var jellyfinServerCard: some View {
