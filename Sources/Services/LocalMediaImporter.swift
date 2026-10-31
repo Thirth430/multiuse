@@ -20,6 +20,7 @@ enum LocalMediaImporter {
     static func importFiles(_ urls: [URL], into context: ModelContext) async -> LocalImportSummary {
         var summary = LocalImportSummary()
         let directory = MediaLibraryRecord.importDirectory
+        var importedRecords: [MediaLibraryRecord] = []
 
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -92,8 +93,14 @@ enum LocalMediaImporter {
                 )
                 record.durationSeconds = duration
                 context.insert(record)
+                importedRecords.append(record)
                 summary.importedCount += 1
             } catch {
+                try? FileManager.default.removeItem(atPath: destinationPath)
+                if let artworkFileName {
+                    let artworkURL = directory.appendingPathComponent("Artwork", isDirectory: true).appendingPathComponent(artworkFileName)
+                    try? FileManager.default.removeItem(at: artworkURL)
+                }
                 summary.failures.append("\(sourceURL.lastPathComponent): \(error.localizedDescription)")
             }
         }
@@ -101,6 +108,14 @@ enum LocalMediaImporter {
         do {
             try context.save()
         } catch {
+            for record in importedRecords {
+                context.delete(record)
+                try? FileManager.default.removeItem(at: record.localURL)
+                if let artworkURL = record.artworkURL {
+                    try? FileManager.default.removeItem(at: artworkURL)
+                }
+            }
+            summary.importedCount = 0
             summary.failures.append("Could not save the library: \(error.localizedDescription)")
         }
         return summary
