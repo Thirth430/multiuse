@@ -55,6 +55,7 @@ struct AppShellView: View {
     @State private var showingDetail = false
     @State private var alertMessage: String?
     @State private var searchText = ""
+    @State private var searchKind: MediaKind?
     private let progressTimer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -518,17 +519,46 @@ struct AppShellView: View {
                     TextField("Search all media…", text: $searchText).textInputAutocapitalization(.never)
                 }
                 .padding(13).background(MediaPalette.surface, in: RoundedRectangle(cornerRadius: 13))
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 7) {
+                        searchFilterButton(title: "All", isSelected: searchKind == nil) { searchKind = nil }
+                        ForEach(MediaKind.allCases) { kind in
+                            searchFilterButton(title: kind.title, isSelected: searchKind == kind) { searchKind = kind }
+                        }
+                    }
+                }
                 ScrollView {
-                    LazyVStack(spacing: 9) {
-                        ForEach(searchResults, id: \.id) { item in MediaRow(item: item) { open(item); showingSearch = false } }
-                        ForEach(serverSearchResults) { item in
-                            JellyfinEntryRow(item: item) {
-                                selectedServerEntry = item
+                    LazyVStack(alignment: .leading, spacing: 9) {
+                        if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            if searchResults.isEmpty && serverSearchResults.isEmpty {
+                                ContentUnavailableView.search(text: searchText)
+                                    .padding(.top, 32)
+                            } else {
+                                if !searchResults.isEmpty {
+                                    Text("On this device")
+                                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                                        .foregroundStyle(MediaPalette.muted)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.top, 4)
+                                    ForEach(searchResults, id: \.id) { item in MediaRow(item: item) { open(item); showingSearch = false } }
+                                }
+                                if !serverSearchResults.isEmpty {
+                                    Text("Jellyfin server")
+                                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                                        .foregroundStyle(MediaPalette.muted)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.top, 10)
+                                    ForEach(serverSearchResults) { item in
+                                        JellyfinEntryRow(item: item) {
+                                            selectedServerEntry = item
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
-                if searchText.isEmpty {
+                if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text(jellyfin.isConnected ? "Search your local and Jellyfin libraries." : "Search imported media here, or connect a Jellyfin server in Settings.")
                         .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted).frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -547,20 +577,35 @@ struct AppShellView: View {
     }
 
     private var searchResults: [MediaLibraryRecord] {
-        guard !searchText.isEmpty else { return [] }
-        let query = searchText.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedQuery.isEmpty else { return [] }
+        let query = trimmedQuery.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
         return items.filter {
+            if let searchKind, $0.kind != searchKind { return false }
             let haystack = "\($0.title) \($0.creator) \($0.collection) \($0.kind.title)".folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
             return haystack.contains(query)
         }
     }
 
     private var serverSearchResults: [JellyfinLibraryEntry] {
-        guard jellyfin.isConnected, !searchText.isEmpty else { return [] }
-        let query = searchText.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard jellyfin.isConnected, !trimmedQuery.isEmpty else { return [] }
+        let query = trimmedQuery.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
         return jellyfin.entries.filter {
+            if let searchKind, $0.kind != searchKind { return false }
             "\($0.title) \($0.creator) \($0.kind.title)".folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current).contains(query)
         }
+    }
+
+    private func searchFilterButton(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(isSelected ? MediaPalette.background : MediaPalette.muted)
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .background(isSelected ? MediaPalette.accent : MediaPalette.surface, in: Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     private func open(_ item: MediaLibraryRecord) { selectedItem = item; showingDetail = true }
