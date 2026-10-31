@@ -74,6 +74,7 @@ private final class ReadiumReaderSession {
     func addBookmark() {
         guard let currentLocator, let locatorJSON = try? currentLocator.jsonString() else { return }
         var saved = bookmarks
+        guard !saved.contains(where: { $0.locatorJSON == locatorJSON }) else { return }
         saved.insert(
             SavedReadingBookmark(
                 id: UUID().uuidString,
@@ -83,6 +84,14 @@ private final class ReadiumReaderSession {
             at: 0
         )
         item.readingBookmarksData = try? JSONEncoder().encode(saved)
+    }
+
+    func removeBookmarks(at offsets: IndexSet) {
+        var saved = bookmarks
+        for index in offsets.sorted(by: >) where saved.indices.contains(index) {
+            saved.remove(at: index)
+        }
+        item.readingBookmarksData = saved.isEmpty ? nil : try? JSONEncoder().encode(saved)
     }
 
     func locator(for bookmark: SavedReadingBookmark) -> Locator? {
@@ -232,18 +241,21 @@ struct ReadiumBookReader: View {
 
     private var bookmarksSheet: some View {
         NavigationStack {
-            List(session.bookmarks) { bookmark in
-                Button(bookmark.label) {
-                    if let locator = session.locator(for: bookmark) {
-                        if let navigator {
-                            Task { _ = await navigator.go(to: locator); showingBookmarks = false }
-                        } else {
-                            comicNavigationRequest = locator
-                            showingBookmarks = false
+            List {
+                ForEach(session.bookmarks) { bookmark in
+                    Button(bookmark.label) {
+                        if let locator = session.locator(for: bookmark) {
+                            if let navigator {
+                                Task { _ = await navigator.go(to: locator); showingBookmarks = false }
+                            } else {
+                                comicNavigationRequest = locator
+                                showingBookmarks = false
+                            }
                         }
                     }
+                    .foregroundStyle(.primary)
                 }
-                .foregroundStyle(.primary)
+                .onDelete(perform: session.removeBookmarks)
             }
             .overlay {
                 if session.bookmarks.isEmpty {
@@ -252,7 +264,11 @@ struct ReadiumBookReader: View {
             }
             .navigationTitle("Bookmarks")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { showingBookmarks = false } } }
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) { EditButton() }
+                ToolbarItem(placement: .topBarTrailing) { Button("Done") { showingBookmarks = false } }
+            }
+            .listStyle(.insetGrouped)
         }
         .presentationDetents([.medium, .large])
     }
