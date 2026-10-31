@@ -47,6 +47,7 @@
 - [x] Add editable bookmark-list deletion for EPUB and CBZ saved positions (runner verification pending).
 - [x] Add CBZ parsing with an app-owned page navigator over Readium's image resources (no CBZ navigator implementation exists in the checked-out source), including saved-page restoration and bookmark navigation.
 - [x] Add horizontal swipe navigation to the CBZ reader while retaining visible previous/next controls (runner verification pending).
+- [x] Add VoiceOver labels to CBZ previous/next page controls (runner verification pending).
 - [x] Downsample CBZ page images to a 2800-pixel maximum dimension before display to reduce peak decoded-image memory use (runner verification pending).
 - [x] Discard cancelled or superseded CBZ page reads so rapid navigation cannot display a stale page or save the wrong locator (runner verification pending).
 - [x] Ignore cancellation errors from superseded CBZ page loads instead of replacing the active page with a stale error state (runner verification pending).

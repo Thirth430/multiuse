@@ -317,6 +317,7 @@ private struct CBZComicReader: View {
                     Button { pageIndex = max(0, pageIndex - 1) } label: {
                         Image(systemName: "chevron.left").frame(width: 46, height: 46)
                     }
+                    .accessibilityLabel("Previous page")
                     .disabled(pageIndex == 0)
                     Spacer()
                     Text(pages.isEmpty ? "0 / 0" : "\(pageIndex + 1) / \(pages.count)")
@@ -325,6 +326,7 @@ private struct CBZComicReader: View {
                     Button { pageIndex = min(pages.count - 1, pageIndex + 1) } label: {
                         Image(systemName: "chevron.right").frame(width: 46, height: 46)
                     }
+                    .accessibilityLabel("Next page")
                     .disabled(pageIndex >= pages.count - 1)
                 }
                 .buttonStyle(.plain)
