@@ -37,6 +37,7 @@ private final class ReadiumReaderSession {
 
     func open() async {
         guard publication == nil else { return }
+        errorMessage = nil
         do {
             guard let fileURL = FileURL(url: item.localURL) else {
                 throw ReaderError.invalidFileURL
@@ -160,6 +161,7 @@ struct ReadiumBookReader: View {
                     } description: {
                         Text(error)
                     } actions: {
+                        Button("Try again") { Task { await session.open() } }
                         Button("Done") { dismiss() }
                     }
                 } else {
@@ -285,6 +287,7 @@ private struct CBZComicReader: View {
     @State private var pageImage: UIImage?
     @State private var errorMessage: String?
     @State private var didRestoreLocation = false
+    @State private var retryToken = 0
 
     private var pages: [ReadiumShared.Link] { publication.readingOrder }
 
@@ -297,8 +300,14 @@ private struct CBZComicReader: View {
                     .scaledToFit()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let errorMessage {
-                ContentUnavailableView("Could not open comic page", systemImage: "exclamationmark.triangle", description: Text(errorMessage))
-                    .foregroundStyle(.white)
+                ContentUnavailableView {
+                    Label("Could not open comic page", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(errorMessage)
+                } actions: {
+                    Button("Try again") { retryToken += 1 }
+                }
+                .foregroundStyle(.white)
             } else {
                 ProgressView("Loading page…").tint(.white).foregroundStyle(.white)
             }
@@ -334,7 +343,7 @@ private struct CBZComicReader: View {
         .onChange(of: navigationRequest?.href.url.absoluteString) { _, _ in
             if let navigationRequest { restore(navigationRequest) }
         }
-        .task(id: pageIndex) { await loadCurrentPage() }
+        .task(id: "\(pageIndex)-\(retryToken)") { await loadCurrentPage() }
         .gesture(DragGesture(minimumDistance: 30).onEnded { value in
             let horizontal = value.translation.width
             guard pages.indices.contains(pageIndex),
@@ -388,6 +397,7 @@ private struct CBZComicReader: View {
             item.lastOpenedAt = .now
             onLocationChange(locator)
         } catch {
+            guard !Task.isCancelled, pageIndex == requestedPageIndex else { return }
             errorMessage = error.localizedDescription
         }
     }
