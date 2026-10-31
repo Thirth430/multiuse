@@ -56,6 +56,8 @@ struct AppShellView: View {
     @State private var alertMessage: String?
     @State private var searchText = ""
     @State private var searchKind: MediaKind?
+    @State private var gameSystemFilter: String?
+    @State private var showFavoriteGamesOnly = false
     private let progressTimer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -281,6 +283,25 @@ struct AppShellView: View {
                 case .artists: groupedMusicRows(collection, by: \.creator, fallback: "Unknown Artist")
                 case .playlists: musicPlaylistSection
                 }
+            } else if section == .game {
+                gameSystemPicker(collection)
+                let filteredGames = collection.filter { game in
+                    if let gameSystemFilter, game.creator != gameSystemFilter { return false }
+                    return !showFavoriteGamesOnly || game.isFavorite
+                }
+                if filteredGames.isEmpty {
+                    if collection.isEmpty {
+                        collectionEmptyState(for: kind)
+                    } else {
+                        ContentUnavailableView(
+                            showFavoriteGamesOnly ? "No favorite games" : "No games for this system",
+                            systemImage: "gamecontroller",
+                            description: Text(showFavoriteGamesOnly ? "Favorite a game to find it here." : "Choose another system or import a game file for this system.")
+                        )
+                    }
+                } else {
+                    ForEach(filteredGames, id: \.id) { item in MediaRow(item: item) { open(item) } }
+                }
             } else if collection.isEmpty { collectionEmptyState(for: kind) }
             else { ForEach(collection, id: \.id) { item in MediaRow(item: item) { open(item) } } }
             if section == .game {
@@ -305,6 +326,20 @@ struct AppShellView: View {
             }
         }
         .padding(4).background(MediaPalette.surface.opacity(0.62), in: Capsule())
+    }
+
+    private func gameSystemPicker(_ games: [MediaLibraryRecord]) -> some View {
+        let systems = Array(Set(games.map(\.creator).filter { !$0.isEmpty }))
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 7) {
+                filterChipButton(title: "All systems", isSelected: gameSystemFilter == nil) { gameSystemFilter = nil }
+                ForEach(systems, id: \.self) { system in
+                    filterChipButton(title: system, isSelected: gameSystemFilter == system) { gameSystemFilter = system }
+                }
+                filterChipButton(title: "Favorites", isSelected: showFavoriteGamesOnly) { showFavoriteGamesOnly.toggle() }
+            }
+        }
     }
 
     @ViewBuilder
@@ -521,9 +556,9 @@ struct AppShellView: View {
                 .padding(13).background(MediaPalette.surface, in: RoundedRectangle(cornerRadius: 13))
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 7) {
-                        searchFilterButton(title: "All", isSelected: searchKind == nil) { searchKind = nil }
+                        filterChipButton(title: "All", isSelected: searchKind == nil) { searchKind = nil }
                         ForEach(MediaKind.allCases) { kind in
-                            searchFilterButton(title: kind.title, isSelected: searchKind == kind) { searchKind = kind }
+                            filterChipButton(title: kind.title, isSelected: searchKind == kind) { searchKind = kind }
                         }
                     }
                 }
@@ -597,7 +632,7 @@ struct AppShellView: View {
         }
     }
 
-    private func searchFilterButton(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+    private func filterChipButton(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 10, weight: .semibold, design: .rounded))

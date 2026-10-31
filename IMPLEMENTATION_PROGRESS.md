@@ -91,6 +91,7 @@
 ## Phase 6 — Retro games
 
 - [x] Import local game files for the listed cartridge and disc image extensions, identify the associated system, and use shared favorites/search/catalog details.
+- [x] Filter the local game library by detected system or favorites, including empty states (runner verification pending).
 - [x] Clearly mark game launch unavailable until a suitable licensed and iOS-compatible core runtime is linked.
 - [x] Verify local game-file import and system classification with the GitHub iOS unit test (checkpoint run #20 passed).
 - [ ] Verify game browsing and favorites on an iOS simulator/device.
