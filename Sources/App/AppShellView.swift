@@ -72,6 +72,9 @@ struct AppShellView: View {
     @State private var gameSystemFilter: String?
     @State private var showFavoritesOnly = false
     @AppStorage("library.sortOrder") private var librarySortOrder = LibrarySortMode.recentlyAdded.rawValue
+    @AppStorage("home.showLocalContinue") private var showLocalContinue = true
+    @AppStorage("home.showServerContinue") private var showServerContinue = true
+    @AppStorage("home.showRecentlyAdded") private var showRecentlyAdded = true
     private let progressTimer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -243,7 +246,7 @@ struct AppShellView: View {
 
             if jellyfin.isConnected { jellyfinServerCard }
 
-            if !continueItems.isEmpty {
+            if showLocalContinue && !continueItems.isEmpty {
                 VStack(alignment: .leading, spacing: 13) {
                     Text("Continue")
                         .font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.white)
@@ -253,7 +256,7 @@ struct AppShellView: View {
                 }
             }
 
-            if !continueServerItems.isEmpty {
+            if showServerContinue && !continueServerItems.isEmpty {
                 VStack(alignment: .leading, spacing: 13) {
                     Text("Continue on Jellyfin")
                         .font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.white)
@@ -264,7 +267,7 @@ struct AppShellView: View {
             }
 
             if items.isEmpty { emptyLibrary }
-            else {
+            else if showRecentlyAdded {
                 VStack(alignment: .leading, spacing: 13) {
                     Text("Recently added").font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.white)
                     ForEach(items.prefix(5), id: \.id) { item in MediaRow(item: item) { open(item) } }
@@ -1249,6 +1252,9 @@ private struct UpNextQueuePanel: View {
 private struct SettingsSheet: View {
     @Environment(JellyfinProvider.self) private var jellyfin
     @AppStorage("library.sortOrder") private var librarySortOrder = LibrarySortMode.recentlyAdded.rawValue
+    @AppStorage("home.showLocalContinue") private var showLocalContinue = true
+    @AppStorage("home.showServerContinue") private var showServerContinue = true
+    @AppStorage("home.showRecentlyAdded") private var showRecentlyAdded = true
 
     var body: some View {
         NavigationStack {
@@ -1260,6 +1266,11 @@ private struct SettingsSheet: View {
                             Text(mode.label).tag(mode.rawValue)
                         }
                     }
+                }
+                Section("Home screen") {
+                    Toggle("Continue on this device", isOn: $showLocalContinue)
+                    Toggle("Continue on Jellyfin", isOn: $showServerContinue)
+                    Toggle("Recently added", isOn: $showRecentlyAdded)
                 }
                 Section("Jellyfin server") {
                     if jellyfin.isConnected {
