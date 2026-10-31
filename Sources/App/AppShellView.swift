@@ -17,6 +17,18 @@ private enum MusicBrowseMode: String, CaseIterable, Identifiable {
     var title: String { rawValue.capitalized }
 }
 
+private enum LibrarySortMode: String, CaseIterable, Identifiable {
+    case recentlyAdded, recentlyOpened, title
+    var id: Self { self }
+    var label: String {
+        switch self {
+        case .recentlyAdded: "Recently added"
+        case .recentlyOpened: "Recently opened"
+        case .title: "Title"
+        }
+    }
+}
+
 private struct MusicCollectionSelection: Identifiable {
     let id = UUID()
     let title: String
@@ -58,6 +70,7 @@ struct AppShellView: View {
     @State private var searchKind: MediaKind?
     @State private var gameSystemFilter: String?
     @State private var showFavoriteGamesOnly = false
+    @AppStorage("library.sortOrder") private var librarySortOrder = LibrarySortMode.recentlyAdded.rawValue
     private let progressTimer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
@@ -256,7 +269,9 @@ struct AppShellView: View {
 
     private var collectionContent: some View {
         let kind = MediaKind(rawValue: section.rawValue)
-        let collection = items.filter { kind == nil || $0.kind == kind }
+        let collection = items
+            .filter { kind == nil || $0.kind == kind }
+            .sorted(by: librarySortComparator)
         return VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .firstTextBaseline) {
                 Text(section.title).font(.system(size: 29, weight: .bold, design: .rounded)).foregroundStyle(.white)
@@ -311,6 +326,26 @@ struct AppShellView: View {
             }
         }
         .padding(.top, 8)
+    }
+
+    private var librarySortComparator: (MediaLibraryRecord, MediaLibraryRecord) -> Bool {
+        let mode = LibrarySortMode(rawValue: librarySortOrder) ?? .recentlyAdded
+        return { lhs, rhs in
+            switch mode {
+            case .recentlyAdded:
+                return lhs.addedAt == rhs.addedAt
+                    ? lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+                    : lhs.addedAt > rhs.addedAt
+            case .recentlyOpened:
+                let leftDate = lhs.lastOpenedAt ?? .distantPast
+                let rightDate = rhs.lastOpenedAt ?? .distantPast
+                if leftDate != rightDate { return leftDate > rightDate }
+                return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+            case .title:
+                let order = lhs.title.localizedCaseInsensitiveCompare(rhs.title)
+                return order == .orderedSame ? lhs.addedAt > rhs.addedAt : order == .orderedAscending
+            }
+        }
     }
 
     private var musicBrowsePicker: some View {
@@ -552,6 +587,12 @@ struct AppShellView: View {
                 HStack {
                     Image(systemName: "magnifyingglass").foregroundStyle(MediaPalette.muted)
                     TextField("Search all media…", text: $searchText).textInputAutocapitalization(.never)
+                    if !searchText.isEmpty {
+                        Button { searchText = "" } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundStyle(MediaPalette.muted)
+                        }
+                        .accessibilityLabel("Clear search")
+                    }
                 }
                 .padding(13).background(MediaPalette.surface, in: RoundedRectangle(cornerRadius: 13))
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -1133,12 +1174,18 @@ private struct UpNextQueuePanel: View {
 
 private struct SettingsSheet: View {
     @Environment(JellyfinProvider.self) private var jellyfin
+    @AppStorage("library.sortOrder") private var librarySortOrder = LibrarySortMode.recentlyAdded.rawValue
 
     var body: some View {
         NavigationStack {
             List {
                 Section("Library") {
                     Label("Local files", systemImage: "folder")
+                    Picker("Sort libraries by", selection: $librarySortOrder) {
+                        ForEach(LibrarySortMode.allCases) { mode in
+                            Text(mode.label).tag(mode.rawValue)
+                        }
+                    }
                 }
                 Section("Jellyfin server") {
                     if jellyfin.isConnected {
