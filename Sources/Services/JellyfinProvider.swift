@@ -17,6 +17,7 @@ struct JellyfinLibraryEntry: Identifiable, Equatable {
     let durationSeconds: Double
     let resumeSeconds: Double
     let lastPlayedAt: Date?
+    let dateAdded: Date?
     var isFavorite: Bool
     let isPlayable: Bool
     let imageURL: URL?
@@ -165,6 +166,7 @@ final class JellyfinProvider {
                     durationSeconds: Double(item.runTimeTicks ?? 0) / 10_000_000,
                     resumeSeconds: Double(item.userData?.playbackPositionTicks ?? 0) / 10_000_000,
                     lastPlayedAt: item.userData?.lastPlayedDate,
+                    dateAdded: item.dateCreated,
                     isFavorite: item.userData?.isFavorite ?? false,
                     isPlayable: kind == .game || (item.type.map {
                         [BaseItemKind.audio, .episode, .movie, .musicVideo, .video].contains($0)
@@ -234,6 +236,7 @@ final class JellyfinProvider {
                     durationSeconds: Double(item.runTimeTicks ?? 0) / 10_000_000,
                     resumeSeconds: Double(item.userData?.playbackPositionTicks ?? 0) / 10_000_000,
                     lastPlayedAt: item.userData?.lastPlayedDate,
+                    dateAdded: item.dateCreated,
                     isFavorite: item.userData?.isFavorite ?? false,
                     isPlayable: true,
                     imageURL: imageURL(for: item, serverURL: client.configuration.url)
@@ -286,6 +289,7 @@ final class JellyfinProvider {
                     durationSeconds: Double(item.runTimeTicks ?? 0) / 10_000_000,
                     resumeSeconds: Double(item.userData?.playbackPositionTicks ?? 0) / 10_000_000,
                     lastPlayedAt: item.userData?.lastPlayedDate,
+                    dateAdded: item.dateCreated,
                     isFavorite: item.userData?.isFavorite ?? false,
                     isPlayable: false,
                     imageURL: imageURL(for: item, serverURL: client.configuration.url)

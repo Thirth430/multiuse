@@ -63,7 +63,7 @@ struct AppShellView: View {
     @State private var selectedPlaylist: MusicPlaylist?
     @State private var selectedMusicCollection: MusicCollectionSelection?
     @State private var selectedServerEntry: JellyfinLibraryEntry?
-    @State private var selectedContinueServerEntry: JellyfinLibraryEntry?
+    @State private var selectedHomeServerEntry: JellyfinLibraryEntry?
     @State private var selectedItem: MediaLibraryRecord?
     @State private var showingDetail = false
     @State private var alertMessage: String?
@@ -108,7 +108,7 @@ struct AppShellView: View {
         .sheet(isPresented: $showingSearch) { searchSheet }
         .sheet(isPresented: $showingSettings) { SettingsSheet() }
         .sheet(isPresented: $showingPlayer) { NowPlayingSheet(showingFullscreenVideo: $showingFullscreenVideo) }
-        .sheet(item: $selectedContinueServerEntry) { item in
+        .sheet(item: $selectedHomeServerEntry) { item in
             JellyfinEntryDetailSheet(item: item) {
                 openPlayback(for: item.kind)
             }
@@ -273,6 +273,16 @@ struct AppShellView: View {
                     ForEach(items.prefix(5), id: \.id) { item in MediaRow(item: item) { open(item) } }
                 }
             }
+
+            if showRecentlyAdded && !recentServerItems.isEmpty {
+                VStack(alignment: .leading, spacing: 13) {
+                    Text("Recently added on Jellyfin")
+                        .font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                    ForEach(recentServerItems.prefix(5)) { item in
+                        JellyfinEntryRow(item: item) { selectedHomeServerEntry = item }
+                    }
+                }
+            }
         }
     }
 
@@ -300,6 +310,13 @@ struct AppShellView: View {
             return item.durationSeconds <= 0 || item.resumeSeconds < item.durationSeconds - 15
         }
         .sorted { ($0.lastPlayedAt ?? .distantPast) > ($1.lastPlayedAt ?? .distantPast) }
+    }
+
+    private var recentServerItems: [JellyfinLibraryEntry] {
+        guard jellyfin.isConnected else { return [] }
+        return jellyfin.entries
+            .filter { $0.dateAdded != nil && !$0.isAlbum && !$0.isArtist && !$0.isPlaylist }
+            .sorted { ($0.dateAdded ?? .distantPast) > ($1.dateAdded ?? .distantPast) }
     }
 
     private var jellyfinServerCard: some View {
