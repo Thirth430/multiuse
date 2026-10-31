@@ -251,7 +251,7 @@ struct AppShellView: View {
                     Text("Continue")
                         .font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.white)
                     ForEach(continueItems.prefix(5), id: \.id) { item in
-                        MediaRow(item: item) { open(item) }
+                        ContinueMediaRow(item: item) { open(item) }
                     }
                 }
             }
@@ -261,7 +261,7 @@ struct AppShellView: View {
                     Text("Continue on Jellyfin")
                         .font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.white)
                     ForEach(continueServerItems.prefix(5)) { item in
-                        JellyfinEntryRow(item: item) { selectedHomeServerEntry = item }
+                        JellyfinEntryRow(item: item, showsProgress: true) { selectedHomeServerEntry = item }
                     }
                 }
             }
@@ -827,6 +827,37 @@ private struct MediaRow: View {
             .padding(9).background(MediaPalette.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 15))
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct ContinueMediaRow: View {
+    let item: MediaLibraryRecord
+    let action: () -> Void
+
+    private var progress: Double {
+        if item.kind == .book { return min(max(item.readingProgression, 0), 1) }
+        guard item.durationSeconds > 0 else { return 0 }
+        return min(max(item.progressSeconds / item.durationSeconds, 0), 1)
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                MediaArtwork(kind: item.kind, size: 48, artworkURL: item.artworkURL)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(item.title).font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1)
+                    Text(item.kind == .book ? "\(Int(progress * 100))% read" : "\(Int(progress * 100))% complete")
+                        .font(.system(size: 10, design: .rounded)).foregroundStyle(MediaPalette.muted)
+                    ProgressView(value: progress).tint(MediaPalette.accent)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(MediaPalette.muted)
+            }
+            .padding(9).background(MediaPalette.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 15))
+            .contentShape(RoundedRectangle(cornerRadius: 15))
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -1706,6 +1737,7 @@ private enum JellyfinGameError: LocalizedError {
 
 private struct JellyfinEntryRow: View {
     let item: JellyfinLibraryEntry
+    var showsProgress = false
     var action: (() -> Void)? = nil
 
     var body: some View {
@@ -1725,6 +1757,11 @@ private struct JellyfinEntryRow: View {
                     Text(item.title).font(.system(size: 13, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1)
                     Text([item.gameSystem ?? "", item.creator, item.kind.title, "Jellyfin"].filter { !$0.isEmpty }.joined(separator: " · "))
                         .font(.system(size: 10, design: .rounded)).foregroundStyle(MediaPalette.muted).lineLimit(1)
+                    if showsProgress && item.durationSeconds > 0 {
+                        ProgressView(value: min(max(item.resumeSeconds / item.durationSeconds, 0), 1))
+                            .tint(MediaPalette.accent)
+                            .accessibilityLabel("Playback progress")
+                    }
                 }
                 Spacer()
                 if item.isFavorite {
