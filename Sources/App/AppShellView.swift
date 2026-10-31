@@ -237,6 +237,16 @@ struct AppShellView: View {
 
             if jellyfin.isConnected { jellyfinServerCard }
 
+            if !continueItems.isEmpty {
+                VStack(alignment: .leading, spacing: 13) {
+                    Text("Continue")
+                        .font(.system(size: 17, weight: .bold, design: .rounded)).foregroundStyle(.white)
+                    ForEach(continueItems.prefix(5), id: \.id) { item in
+                        MediaRow(item: item) { open(item) }
+                    }
+                }
+            }
+
             if items.isEmpty { emptyLibrary }
             else {
                 VStack(alignment: .leading, spacing: 13) {
@@ -245,6 +255,23 @@ struct AppShellView: View {
                 }
             }
         }
+    }
+
+    private var continueItems: [MediaLibraryRecord] {
+        let activeID = playback.currentItem?.id
+        return items.filter { item in
+            guard item.id != activeID else { return false }
+            switch item.kind {
+            case .music, .video:
+                return item.progressSeconds > 15 &&
+                    (item.durationSeconds <= 0 || item.progressSeconds < item.durationSeconds - 15)
+            case .book:
+                return item.readingProgression > 0 && item.readingProgression < 0.99
+            case .game:
+                return false
+            }
+        }
+        .sorted { ($0.lastOpenedAt ?? .distantPast) > ($1.lastOpenedAt ?? .distantPast) }
     }
 
     private var jellyfinServerCard: some View {

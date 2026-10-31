@@ -12,6 +12,7 @@
 - [x] Add document-picker import into the app container for audio, video, EPUB, and CBZ files.
 - [x] Clean up copied files and artwork when an import or catalog save fails, and report zero imports when the catalog transaction fails (latest user-confirmed GitHub checkpoint passed after fixing the cleanup scope compile error).
 - [x] Add local search, favorites, recents, and per-category empty states.
+- [x] Add a Home Continue shelf for unfinished local music, video, and books, excluding active playback and completed positions (runner verification pending).
 - [x] Browse local media by favorites across music, video, books, and games while retaining the distinct music-playlist view (runner verification pending).
 - [x] Add a persistent library sort setting for recent additions, recent openings, or title while retaining home recency ordering (runner verification pending).
 - [x] Group unified search results by local/Jellyfin source, trim surrounding query whitespace, filter both sources by media kind, show a no-results state, and provide a clear-search action (runner verification pending).
