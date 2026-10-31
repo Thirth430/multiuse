@@ -69,7 +69,7 @@ struct AppShellView: View {
     @State private var searchText = ""
     @State private var searchKind: MediaKind?
     @State private var gameSystemFilter: String?
-    @State private var showFavoriteGamesOnly = false
+    @State private var showFavoritesOnly = false
     @AppStorage("library.sortOrder") private var librarySortOrder = LibrarySortMode.recentlyAdded.rawValue
     private let progressTimer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
 
@@ -269,8 +269,9 @@ struct AppShellView: View {
 
     private var collectionContent: some View {
         let kind = MediaKind(rawValue: section.rawValue)
-        let collection = items
-            .filter { kind == nil || $0.kind == kind }
+        let allCollection = items.filter { kind == nil || $0.kind == kind }
+        let collection = allCollection
+            .filter { !showFavoritesOnly || $0.isFavorite }
             .sorted(by: librarySortComparator)
         return VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .firstTextBaseline) {
@@ -288,36 +289,40 @@ struct AppShellView: View {
                     Label(section == .game ? "Add games" : "Import", systemImage: "plus").font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(MediaPalette.accent)
                 }
             }
+            HStack {
+                if section != .music || musicBrowseMode != .playlists {
+                    filterChipButton(title: "Favorites", isSelected: showFavoritesOnly) { showFavoritesOnly.toggle() }
+                }
+                Spacer()
+                Text(section == .music && musicBrowseMode == .playlists ? "\(playlists.count) playlists" : "\(collection.count) items")
+                    .font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(MediaPalette.muted)
+            }
             if section == .music {
                 musicBrowsePicker
                 switch musicBrowseMode {
                 case .songs:
-                    if collection.isEmpty { collectionEmptyState(for: kind) }
+                    if collection.isEmpty { filteredCollectionEmptyState(for: kind, totalCount: allCollection.count) }
                     else { ForEach(collection, id: \.id) { item in MediaRow(item: item) { open(item) } } }
-                case .albums: groupedMusicRows(collection, by: \.collection, fallback: "Unknown Album")
-                case .artists: groupedMusicRows(collection, by: \.creator, fallback: "Unknown Artist")
+                case .albums: groupedMusicRows(collection, by: \.collection, fallback: "Unknown Album", totalCount: allCollection.count)
+                case .artists: groupedMusicRows(collection, by: \.creator, fallback: "Unknown Artist", totalCount: allCollection.count)
                 case .playlists: musicPlaylistSection
                 }
             } else if section == .game {
                 gameSystemPicker(collection)
                 let filteredGames = collection.filter { game in
                     if let gameSystemFilter, game.creator != gameSystemFilter { return false }
-                    return !showFavoriteGamesOnly || game.isFavorite
+                    return true
                 }
                 if filteredGames.isEmpty {
-                    if collection.isEmpty {
+                    if collection.isEmpty && allCollection.isEmpty {
                         collectionEmptyState(for: kind)
                     } else {
-                        ContentUnavailableView(
-                            showFavoriteGamesOnly ? "No favorite games" : "No games for this system",
-                            systemImage: "gamecontroller",
-                            description: Text(showFavoriteGamesOnly ? "Favorite a game to find it here." : "Choose another system or import a game file for this system.")
-                        )
+                        ContentUnavailableView("No games match these filters", systemImage: "gamecontroller", description: Text("Choose another system or favorite a game in this library."))
                     }
                 } else {
                     ForEach(filteredGames, id: \.id) { item in MediaRow(item: item) { open(item) } }
                 }
-            } else if collection.isEmpty { collectionEmptyState(for: kind) }
+            } else if collection.isEmpty { filteredCollectionEmptyState(for: kind, totalCount: allCollection.count) }
             else { ForEach(collection, id: \.id) { item in MediaRow(item: item) { open(item) } } }
             if section == .game {
                 Text("Local game files are cataloged by system. Emulation launch is unavailable until a compatible, licensed core runtime is integrated. No games or BIOS files are bundled.")
@@ -372,22 +377,30 @@ struct AppShellView: View {
                 ForEach(systems, id: \.self) { system in
                     filterChipButton(title: system, isSelected: gameSystemFilter == system) { gameSystemFilter = system }
                 }
-                filterChipButton(title: "Favorites", isSelected: showFavoriteGamesOnly) { showFavoriteGamesOnly.toggle() }
             }
         }
     }
 
     @ViewBuilder
-    private func groupedMusicRows(_ tracks: [MediaLibraryRecord], by keyPath: KeyPath<MediaLibraryRecord, String>, fallback: String) -> some View {
+    private func groupedMusicRows(
+        _ tracks: [MediaLibraryRecord],
+        by keyPath: KeyPath<MediaLibraryRecord, String>,
+        fallback: String,
+        totalCount: Int
+    ) -> some View {
         let groups = Dictionary(grouping: tracks) { item in
             let value = item[keyPath: keyPath].trimmingCharacters(in: .whitespacesAndNewlines)
             return value.isEmpty ? fallback : value
         }
         if groups.isEmpty {
-            Text("Import tracks with album or artist tags to browse this view.")
-                .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
-                .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-                .background(MediaPalette.surface, in: RoundedRectangle(cornerRadius: 14))
+            if totalCount == 0 {
+                Text("Import tracks with album or artist tags to browse this view.")
+                    .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
+                    .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(MediaPalette.surface, in: RoundedRectangle(cornerRadius: 14))
+            } else {
+                filteredCollectionEmptyState(for: .music, totalCount: totalCount)
+            }
         } else {
             ForEach(groups.keys.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }, id: \.self) { title in
                 let groupTracks = (groups[title] ?? []).sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
@@ -495,6 +508,15 @@ struct AppShellView: View {
             .tint(MediaPalette.accent).padding(.top, 3)
         }
         .padding(18).frame(maxWidth: .infinity, alignment: .leading).background(MediaPalette.surface, in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    @ViewBuilder
+    private func filteredCollectionEmptyState(for kind: MediaKind?, totalCount: Int) -> some View {
+        if totalCount == 0 {
+            collectionEmptyState(for: kind)
+        } else {
+            ContentUnavailableView("No favorites here", systemImage: "heart", description: Text("Mark an item as a favorite to see it in this library view."))
+        }
     }
 
     private func emptyDescription(for kind: MediaKind?) -> String {
