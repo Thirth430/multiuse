@@ -333,17 +333,19 @@ private struct CBZComicReader: View {
 
     @MainActor
     private func loadCurrentPage() async {
-        guard pages.indices.contains(pageIndex) else {
+        let requestedPageIndex = pageIndex
+        guard pages.indices.contains(requestedPageIndex) else {
             errorMessage = "This comic archive contains no readable image pages."
             return
         }
         pageImage = nil
         errorMessage = nil
         do {
-            guard let resource = publication.get(pages[pageIndex]) else {
+            guard let resource = publication.get(pages[requestedPageIndex]) else {
                 throw ComicReaderError.missingPage
             }
             let data = try await resource.read().get()
+            guard !Task.isCancelled, pageIndex == requestedPageIndex else { return }
             guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
                   let image = CGImageSourceCreateThumbnailAtIndex(
                     imageSource,
@@ -357,13 +359,13 @@ private struct CBZComicReader: View {
                 throw ComicReaderError.unsupportedPage
             }
             pageImage = UIImage(cgImage: image)
-            guard let mediaType = pages[pageIndex].mediaType else { throw ComicReaderError.unsupportedPage }
-            let progression = Double(pageIndex) / Double(max(1, pages.count))
+            guard let mediaType = pages[requestedPageIndex].mediaType else { throw ComicReaderError.unsupportedPage }
+            let progression = Double(requestedPageIndex) / Double(max(1, pages.count))
             let locator = Locator(
-                href: pages[pageIndex].url(),
+                href: pages[requestedPageIndex].url(),
                 mediaType: mediaType,
-                title: pages[pageIndex].title,
-                locations: .init(totalProgression: progression, position: pageIndex + 1)
+                title: pages[requestedPageIndex].title,
+                locations: .init(totalProgression: progression, position: requestedPageIndex + 1)
             )
             item.readingLocatorJSON = try? locator.jsonString()
             item.readingProgression = progression
