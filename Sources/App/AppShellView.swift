@@ -593,7 +593,7 @@ struct AppShellView: View {
         let query = trimmedQuery.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
         return jellyfin.entries.filter {
             if let searchKind, $0.kind != searchKind { return false }
-            "\($0.title) \($0.creator) \($0.kind.title)".folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current).contains(query)
+            return "\($0.title) \($0.creator) \($0.kind.title)".folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current).contains(query)
         }
     }
 
