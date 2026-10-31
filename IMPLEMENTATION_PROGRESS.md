@@ -23,6 +23,7 @@
 - [x] Add an Up Next panel to the player with queue selection, reordering, and removal controls.
 - [x] Add persistent local music playlists with create/edit/delete, reorderable track membership, playlist browsing, and playlist queue playback.
 - [x] Restore the prior playlist order and surface an error when saving a reorder fails; restore a deleted playlist in the view context when deletion cannot be saved (runner verification pending).
+- [x] Keep the playlist editor open and show a recoverable error when saving fails; revert failed edits and discard failed new playlist inserts (runner verification pending).
 - [x] Add grouped album and artist browsing with detail lists and queue playback.
 - [x] Add a playlist persistence unit test for ordered track IDs.
 - [x] Verify playlist ordered-ID persistence with the new GitHub iOS unit test (checkpoint run #20 passed).

@@ -98,13 +98,25 @@ struct AppShellView: View {
                 playlist: editingPlaylist
             ) { name, selectedIDs in
                 if let editingPlaylist {
+                    let previousName = editingPlaylist.name
+                    let previousIDs = editingPlaylist.itemIDs
                     editingPlaylist.name = name
                     editingPlaylist.itemIDs = selectedIDs
+                    do { try modelContext.save() }
+                    catch {
+                        editingPlaylist.name = previousName
+                        editingPlaylist.itemIDs = previousIDs
+                        throw error
+                    }
                 } else {
-                    modelContext.insert(MusicPlaylist(name: name, itemIDs: selectedIDs))
+                    let playlist = MusicPlaylist(name: name, itemIDs: selectedIDs)
+                    modelContext.insert(playlist)
+                    do { try modelContext.save() }
+                    catch {
+                        modelContext.delete(playlist)
+                        throw error
+                    }
                 }
-                do { try modelContext.save() }
-                catch { alertMessage = "The playlist could not be saved: \(error.localizedDescription)" }
             }
         }
         .sheet(isPresented: $showingPlaylistDetail) {
@@ -1476,11 +1488,12 @@ private struct MusicPlaylistEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
     let tracks: [MediaLibraryRecord]
     let playlist: MusicPlaylist?
-    let onSave: (String, [String]) -> Void
+    let onSave: (String, [String]) throws -> Void
     @State private var name: String
     @State private var selectedIDs: Set<String>
+    @State private var saveError: String?
 
-    init(tracks: [MediaLibraryRecord], playlist: MusicPlaylist?, onSave: @escaping (String, [String]) -> Void) {
+    init(tracks: [MediaLibraryRecord], playlist: MusicPlaylist?, onSave: @escaping (String, [String]) throws -> Void) {
         self.tracks = tracks
         self.playlist = playlist
         self.onSave = onSave
@@ -1527,14 +1540,26 @@ private struct MusicPlaylistEditorSheet: View {
                 ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") {
-                        onSave(name.trimmingCharacters(in: .whitespacesAndNewlines), tracks.map(\.id).filter(selectedIDs.contains))
-                        dismiss()
+                        do {
+                            try onSave(name.trimmingCharacters(in: .whitespacesAndNewlines), tracks.map(\.id).filter(selectedIDs.contains))
+                            dismiss()
+                        } catch {
+                            saveError = "The playlist could not be saved: \(error.localizedDescription)"
+                        }
                     }
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
         }
         .preferredColorScheme(.dark)
+        .alert("Couldn’t save playlist", isPresented: Binding(
+            get: { saveError != nil },
+            set: { if !$0 { saveError = nil } }
+        )) {
+            Button("OK", role: .cancel) { saveError = nil }
+        } message: {
+            Text(saveError ?? "")
+        }
     }
 }
 
