@@ -318,6 +318,16 @@ private struct CBZComicReader: View {
             if let navigationRequest { restore(navigationRequest) }
         }
         .task(id: pageIndex) { await loadCurrentPage() }
+        .gesture(DragGesture(minimumDistance: 30).onEnded { value in
+            let horizontal = value.translation.width
+            guard pages.indices.contains(pageIndex),
+                  abs(horizontal) > abs(value.translation.height), abs(horizontal) > 40 else { return }
+            if horizontal < 0 {
+                pageIndex = min(pages.count - 1, pageIndex + 1)
+            } else {
+                pageIndex = max(0, pageIndex - 1)
+            }
+        })
     }
 
     @MainActor
