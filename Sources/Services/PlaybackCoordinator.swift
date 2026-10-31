@@ -85,13 +85,14 @@ final class PlaybackCoordinator {
         queue = items.isEmpty ? [item] : items
         queueIndex = min(max(startIndex, 0), queue.count - 1)
         remoteQueue = []
-        endRemoteSession()
-        remoteProvider = nil
         guard FileManager.default.fileExists(atPath: item.localURL.path) else {
+            stop()
             errorMessage = "This file is no longer available in the app library. You can remove it and import it again."
             return
         }
 
+        endRemoteSession()
+        remoteProvider = nil
         _ = start(item, from: item.localURL, at: item.progressSeconds)
     }
 
