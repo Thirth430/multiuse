@@ -43,6 +43,7 @@ enum LocalMediaImporter {
             let extensionName = sourceURL.pathExtension.lowercased()
             let destinationName = "\(UUID().uuidString).\(extensionName)"
             let destinationPath = directory.appendingPathComponent(destinationName).path
+            var artworkFileName: String?
 
             do {
                 try await Task.detached(priority: .utility) {
@@ -53,7 +54,6 @@ enum LocalMediaImporter {
                 var creator = ""
                 var collection = ""
                 var duration = 0.0
-                var artworkFileName: String?
                 if kind == .music {
                     let metadata = await LocalMusicMetadataLoader.loadAudio(
                         at: URL(fileURLWithPath: destinationPath),
