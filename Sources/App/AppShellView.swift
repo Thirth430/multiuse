@@ -585,6 +585,12 @@ private struct MediaRow: View {
                 }
                 Spacer()
                 if item.isFavorite { Image(systemName: "heart.fill").font(.system(size: 11)).foregroundStyle(.pink) }
+                if !FileManager.default.fileExists(atPath: item.localURL.path) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.orange)
+                        .accessibilityLabel("Imported file missing")
+                }
                 Image(systemName: "chevron.right").font(.system(size: 10, weight: .bold)).foregroundStyle(MediaPalette.muted)
             }
             .padding(9).background(MediaPalette.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 15))
