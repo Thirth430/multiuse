@@ -65,6 +65,7 @@
 - [x] Add server browsing, media-type filters, local-plus-server search, refresh, and disconnect controls.
 - [x] Page through Jellyfin library results in batches of 200 until the server's total record count is reached.
 - [x] Add Jellyfin-backed favorite state and toggle actions in server item details; show favorite markers in server browse rows.
+- [x] Filter the Jellyfin server library by favorites while retaining the selected media-type filter (runner verification pending).
 - [x] Browse tracks within Jellyfin music albums and start a selected server track from the album detail.
 - [x] Include Jellyfin music artists in the server catalog and browse each artist's albums before opening album tracks.
 - [x] Include Jellyfin playlists in the server catalog and browse playlist tracks with individual playback actions.

@@ -1388,11 +1388,12 @@ private struct JellyfinLibrarySheet: View {
     @Environment(JellyfinProvider.self) private var jellyfin
     let onPlaybackStarted: (MediaKind) -> Void
     @State private var filter = "all"
+    @State private var favoritesOnly = false
     @State private var selectedEntry: JellyfinLibraryEntry?
 
     private var visibleItems: [JellyfinLibraryEntry] {
-        guard filter != "all" else { return jellyfin.entries }
-        return jellyfin.entries.filter { $0.kind.rawValue == filter }
+        let typeFiltered = filter == "all" ? jellyfin.entries : jellyfin.entries.filter { $0.kind.rawValue == filter }
+        return favoritesOnly ? typeFiltered.filter(\.isFavorite) : typeFiltered
     }
 
     var body: some View {
@@ -1407,11 +1408,25 @@ private struct JellyfinLibrarySheet: View {
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal, 16)
+                Button {
+                    favoritesOnly.toggle()
+                } label: {
+                    Label(favoritesOnly ? "Showing favorites" : "Favorites only", systemImage: favoritesOnly ? "heart.fill" : "heart")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(favoritesOnly ? MediaPalette.background : MediaPalette.accent)
+                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .background(favoritesOnly ? MediaPalette.accent : MediaPalette.surface, in: Capsule())
+                }
+                .buttonStyle(.plain)
 
                 if jellyfin.isLoading && jellyfin.entries.isEmpty {
                     ProgressView("Loading server library…").tint(MediaPalette.accent).frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if visibleItems.isEmpty {
-                    ContentUnavailableView("No matching server items", systemImage: "server.rack", description: Text("Try another media filter or refresh the Jellyfin library."))
+                    ContentUnavailableView(
+                        favoritesOnly ? "No server favorites" : "No matching server items",
+                        systemImage: favoritesOnly ? "heart" : "server.rack",
+                        description: Text(favoritesOnly ? "Favorite a Jellyfin item or choose another media filter." : "Try another media filter or refresh the Jellyfin library.")
+                    )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
