@@ -342,9 +342,15 @@ struct AppShellView: View {
     private var collectionContent: some View {
         let kind = MediaKind(rawValue: section.rawValue)
         let allCollection = items.filter { kind == nil || $0.kind == kind }
+        let shouldFilterFavorites = showFavoritesOnly && !(section == .music && musicBrowseMode == .playlists)
         let collection = allCollection
-            .filter { !showFavoritesOnly || $0.isFavorite }
+            .filter { !shouldFilterFavorites || $0.isFavorite }
             .sorted(by: librarySortComparator)
+        let serverCollection = jellyfinCollection(for: kind)
+        let visibleServerCollection = serverCollection.filter { item in
+            (!shouldFilterFavorites || item.isFavorite) &&
+                (section != .game || gameSystemFilter == nil || item.gameSystem == gameSystemFilter)
+        }
         return VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .firstTextBaseline) {
                 Text(section.title).font(.system(size: 29, weight: .bold, design: .rounded)).foregroundStyle(.white)
@@ -366,9 +372,15 @@ struct AppShellView: View {
                     filterChipButton(title: "Favorites", isSelected: showFavoritesOnly) { showFavoritesOnly.toggle() }
                 }
                 Spacer()
-                Text(section == .music && musicBrowseMode == .playlists ? "\(playlists.count) playlists" : "\(collection.count) items")
-                    .font(.system(size: 10, weight: .medium, design: .rounded)).foregroundStyle(MediaPalette.muted)
             }
+            HStack(spacing: 7) {
+                Image(systemName: "iphone").foregroundStyle(MediaPalette.accent)
+                Text("On this device").foregroundStyle(.white)
+                Spacer()
+                Text(section == .music && musicBrowseMode == .playlists ? "\(playlists.count) playlists" : "\(collection.count) items")
+                    .foregroundStyle(MediaPalette.muted)
+            }
+            .font(.system(size: 14, weight: .bold, design: .rounded))
             if section == .music {
                 musicBrowsePicker
                 switch musicBrowseMode {
@@ -380,14 +392,16 @@ struct AppShellView: View {
                 case .playlists: musicPlaylistSection
                 }
             } else if section == .game {
-                gameSystemPicker(collection)
+                gameSystemPicker(collection, serverGames: serverCollection)
                 let filteredGames = collection.filter { game in
                     if let gameSystemFilter, game.creator != gameSystemFilter { return false }
                     return true
                 }
                 if filteredGames.isEmpty {
-                    if collection.isEmpty && allCollection.isEmpty {
+                    if allCollection.isEmpty && serverCollection.isEmpty {
                         collectionEmptyState(for: kind)
+                    } else if !visibleServerCollection.isEmpty {
+                        ContentUnavailableView("No matching games on this device", systemImage: "gamecontroller", description: Text("Matching Jellyfin games are listed below."))
                     } else {
                         ContentUnavailableView("No games match these filters", systemImage: "gamecontroller", description: Text("Choose another system or favorite a game in this library."))
                     }
@@ -396,6 +410,9 @@ struct AppShellView: View {
                 }
             } else if collection.isEmpty { filteredCollectionEmptyState(for: kind, totalCount: allCollection.count) }
             else { ForEach(collection, id: \.id) { item in MediaRow(item: item) { open(item) } } }
+            if !visibleServerCollection.isEmpty {
+                serverLibrarySection(visibleServerCollection, kind: kind)
+            }
             if section == .game {
                 Text("Local game files are cataloged by system. Emulation launch is unavailable until a compatible, licensed core runtime is integrated. No games or BIOS files are bundled.")
                     .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted)
@@ -403,6 +420,53 @@ struct AppShellView: View {
             }
         }
         .padding(.top, 8)
+    }
+
+    private func jellyfinCollection(for kind: MediaKind?) -> [JellyfinLibraryEntry] {
+        guard jellyfin.isConnected, let kind else { return [] }
+        return jellyfin.entries
+            .filter { item in
+                guard item.kind == kind else { return false }
+                guard kind == .music else { return true }
+                switch musicBrowseMode {
+                case .songs: return !item.isAlbum && !item.isArtist && !item.isPlaylist
+                case .albums: return item.isAlbum
+                case .artists: return item.isArtist
+                case .playlists: return item.isPlaylist
+                }
+            }
+            .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+    }
+
+    private func serverLibrarySection(_ entries: [JellyfinLibraryEntry], kind: MediaKind?) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(spacing: 7) {
+                Image(systemName: "server.rack").foregroundStyle(MediaPalette.accent)
+                Text("On Jellyfin").foregroundStyle(.white)
+                Spacer()
+                Text("\(entries.count) items").foregroundStyle(MediaPalette.muted)
+                if jellyfin.isLoading {
+                    ProgressView().controlSize(.small).tint(MediaPalette.accent)
+                } else {
+                    Button {
+                        Task { await jellyfin.refreshLibrary() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise").foregroundStyle(MediaPalette.accent)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Refresh Jellyfin library")
+                }
+            }
+            .font(.system(size: 14, weight: .bold, design: .rounded))
+            ForEach(entries) { item in
+                JellyfinEntryRow(item: item, showsProgress: item.resumeSeconds > 0) {
+                    selectedHomeServerEntry = item
+                }
+            }
+        }
+        .padding(.top, 5)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(kind?.title ?? "Media") from Jellyfin")
     }
 
     private var librarySortComparator: (MediaLibraryRecord, MediaLibraryRecord) -> Bool {
@@ -440,8 +504,8 @@ struct AppShellView: View {
         .padding(4).background(MediaPalette.surface.opacity(0.62), in: Capsule())
     }
 
-    private func gameSystemPicker(_ games: [MediaLibraryRecord]) -> some View {
-        let systems = Array(Set(games.map(\.creator).filter { !$0.isEmpty }))
+    private func gameSystemPicker(_ games: [MediaLibraryRecord], serverGames: [JellyfinLibraryEntry]) -> some View {
+        let systems = Array(Set(games.map(\.creator).filter { !$0.isEmpty } + serverGames.compactMap(\.gameSystem)))
             .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
         return ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 7) {
