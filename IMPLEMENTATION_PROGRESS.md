@@ -18,8 +18,9 @@
 - [x] Add Settings toggles to show or hide local Continue, Jellyfin Continue, and Recently Added Home shelves (runner verification pending).
 - [x] Browse local media by favorites across music, video, books, and games while retaining the distinct music-playlist view (runner verification pending).
 - [x] Add a persistent library sort setting for recent additions, recent openings, or title while retaining home recency ordering (runner verification pending).
-- [x] Group unified search results by local/Jellyfin source, trim surrounding query whitespace, filter both sources by media kind, show a no-results state, and provide a clear-search action (runner verification pending).
+- [x] Group unified search results by local/Jellyfin source, trim surrounding query whitespace, filter both sources by media kind, show a no-results state, and provide a clear-search action (user-confirmed GitHub checkpoint passed).
 - [x] Surface missing imported files in local media details, disable open/play actions for missing files, and roll back local favorite changes when persistence fails (runner verification pending).
+- [x] Move local media rows and details, including persistence-aware favorites/removal and Readium launch, into a local-library feature source while preserving use from category browsing and unified search (static review complete; runner verification pending).
 - [x] Confirm media removal, delete its imported file and artwork after catalog save, remove playlist references and queued entries, and stop it if currently playing.
 - [x] Add AVPlayer-based local audio/video controls and progress checkpoints.
 - [x] Add a manually triggered GitHub Actions workflow and first importer unit tests.
@@ -69,7 +70,7 @@
 - [x] Show origin-separated local and Jellyfin items inside each media category, reuse the existing Jellyfin detail/playback route, include server favorites in the category Favorites filter, and include JellyEmu game systems in the game system filter (user-confirmed GitHub checkpoint passed on the current checkpoint).
 - [x] Move the Jellyfin library sheet into its own feature source file and expose only the shared palette/artwork/list/detail view boundaries needed by the app shell (user-confirmed GitHub checkpoint passed).
 - [x] Move Jellyfin item details, remote artwork, list rows, and server playback setup into feature sources, and extract the shared palette/artwork views from the app shell while leaving app-wide navigation and playback-session ownership in the shell/coordinator (user-confirmed GitHub checkpoint passed).
-- [x] Extract grouped local/Jellyfin search, media-kind filters, and server-result detail routing into `UnifiedSearchSheet` with callbacks for shell navigation (static review complete; runner verification pending).
+- [x] Extract grouped local/Jellyfin search, media-kind filters, and server-result detail routing into `UnifiedSearchSheet` with callbacks for shell navigation (user-confirmed GitHub checkpoint passed).
 - [x] Browse tracks within Jellyfin music albums and start a selected server track from the album detail.
 - [x] Include Jellyfin music artists in the server catalog and browse each artist's albums before opening album tracks.
 - [x] Include Jellyfin playlists in the server catalog and browse playlist tracks with individual playback actions.
