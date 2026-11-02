@@ -67,7 +67,8 @@
 - [x] Add Jellyfin-backed favorite state and toggle actions in server item details; show favorite markers in server browse rows.
 - [x] Filter the Jellyfin server library by favorites while retaining the selected media-type filter (user-confirmed GitHub checkpoint passed).
 - [x] Show origin-separated local and Jellyfin items inside each media category, reuse the existing Jellyfin detail/playback route, include server favorites in the category Favorites filter, and include JellyEmu game systems in the game system filter (user-confirmed GitHub checkpoint passed on the current checkpoint).
-- [x] Move the Jellyfin library sheet into its own feature source file and expose only the shared palette/artwork/list/detail view boundaries needed by the app shell (static review complete; runner verification pending).
+- [x] Move the Jellyfin library sheet into its own feature source file and expose only the shared palette/artwork/list/detail view boundaries needed by the app shell (user-confirmed GitHub checkpoint passed).
+- [x] Move Jellyfin item details, remote artwork, list rows, and server playback setup into feature sources, and extract the shared palette/artwork views from the app shell while leaving app-wide navigation and playback-session ownership in the shell/coordinator (static review complete; runner verification pending).
 - [x] Browse tracks within Jellyfin music albums and start a selected server track from the album detail.
 - [x] Include Jellyfin music artists in the server catalog and browse each artist's albums before opening album tracks.
 - [x] Include Jellyfin playlists in the server catalog and browse playlist tracks with individual playback actions.
