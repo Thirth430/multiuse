@@ -55,13 +55,10 @@ struct AppShellView: View {
     @State private var editingPlaylist: MusicPlaylist?
     @State private var selectedPlaylist: MusicPlaylist?
     @State private var selectedMusicCollection: MusicCollectionSelection?
-    @State private var selectedServerEntry: JellyfinLibraryEntry?
     @State private var selectedHomeServerEntry: JellyfinLibraryEntry?
     @State private var selectedItem: MediaLibraryRecord?
     @State private var showingDetail = false
     @State private var alertMessage: String?
-    @State private var searchText = ""
-    @State private var searchKind: MediaKind?
     @State private var gameSystemFilter: String?
     @State private var showFavoritesOnly = false
     @AppStorage("library.sortOrder") private var librarySortOrder = LibrarySortMode.recentlyAdded.rawValue
@@ -98,7 +95,14 @@ struct AppShellView: View {
             case .failure(let error): alertMessage = error.localizedDescription
             }
         }
-        .sheet(isPresented: $showingSearch) { searchSheet }
+        .sheet(isPresented: $showingSearch) {
+            UnifiedSearchSheet(
+                localItems: items,
+                onOpenLocal: { item in open(item); showingSearch = false },
+                onPlaybackStarted: { openPlayback(for: $0, closingSearch: true) },
+                onDismiss: { showingSearch = false }
+            )
+        }
         .sheet(isPresented: $showingSettings) { SettingsSheet() }
         .sheet(isPresented: $showingPlayer) { NowPlayingSheet(showingFullscreenVideo: $showingFullscreenVideo) }
         .sheet(item: $selectedHomeServerEntry) { item in
@@ -732,98 +736,6 @@ struct AppShellView: View {
         .overlay(alignment: .top) { Rectangle().fill(.white.opacity(0.07)).frame(height: 1) }
     }
 
-    private var searchSheet: some View {
-        NavigationStack {
-            VStack(spacing: 14) {
-                HStack {
-                    Image(systemName: "magnifyingglass").foregroundStyle(MediaPalette.muted)
-                    TextField("Search all media…", text: $searchText).textInputAutocapitalization(.never)
-                    if !searchText.isEmpty {
-                        Button { searchText = "" } label: {
-                            Image(systemName: "xmark.circle.fill").foregroundStyle(MediaPalette.muted)
-                        }
-                        .accessibilityLabel("Clear search")
-                    }
-                }
-                .padding(13).background(MediaPalette.surface, in: RoundedRectangle(cornerRadius: 13))
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 7) {
-                        filterChipButton(title: "All", isSelected: searchKind == nil) { searchKind = nil }
-                        ForEach(MediaKind.allCases) { kind in
-                            filterChipButton(title: kind.title, isSelected: searchKind == kind) { searchKind = kind }
-                        }
-                    }
-                }
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 9) {
-                        if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            if searchResults.isEmpty && serverSearchResults.isEmpty {
-                                ContentUnavailableView.search(text: searchText)
-                                    .padding(.top, 32)
-                            } else {
-                                if !searchResults.isEmpty {
-                                    Text("On this device")
-                                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                                        .foregroundStyle(MediaPalette.muted)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.top, 4)
-                                    ForEach(searchResults, id: \.id) { item in MediaRow(item: item) { open(item); showingSearch = false } }
-                                }
-                                if !serverSearchResults.isEmpty {
-                                    Text("Jellyfin server")
-                                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                                        .foregroundStyle(MediaPalette.muted)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.top, 10)
-                                    ForEach(serverSearchResults) { item in
-                                        JellyfinEntryRow(item: item) {
-                                            selectedServerEntry = item
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text(jellyfin.isConnected ? "Search your local and Jellyfin libraries." : "Search imported media here, or connect a Jellyfin server in Settings.")
-                        .font(.system(size: 12, design: .rounded)).foregroundStyle(MediaPalette.muted).frame(maxWidth: .infinity, alignment: .leading)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(18).background(MediaPalette.background)
-            .navigationTitle("Search").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { showingSearch = false } } }
-            .sheet(item: $selectedServerEntry) { item in
-                JellyfinEntryDetailSheet(item: item) {
-                    openPlayback(for: item.kind, closingSearch: true)
-                }
-            }
-        }
-        .preferredColorScheme(.dark).presentationDetents([.medium, .large])
-    }
-
-    private var searchResults: [MediaLibraryRecord] {
-        let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedQuery.isEmpty else { return [] }
-        let query = trimmedQuery.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-        return items.filter {
-            if let searchKind, $0.kind != searchKind { return false }
-            let haystack = "\($0.title) \($0.creator) \($0.collection) \($0.kind.title)".folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-            return haystack.contains(query)
-        }
-    }
-
-    private var serverSearchResults: [JellyfinLibraryEntry] {
-        let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard jellyfin.isConnected, !trimmedQuery.isEmpty else { return [] }
-        let query = trimmedQuery.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-        return jellyfin.entries.filter {
-            if let searchKind, $0.kind != searchKind { return false }
-            return "\($0.title) \($0.creator) \($0.kind.title)".folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current).contains(query)
-        }
-    }
-
     private func filterChipButton(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
@@ -859,7 +771,7 @@ struct AppShellView: View {
     }
 }
 
-private struct MediaRow: View {
+struct MediaRow: View {
     let item: MediaLibraryRecord
     let action: () -> Void
     var body: some View {
