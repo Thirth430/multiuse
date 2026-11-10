@@ -1,5 +1,21 @@
 # Implementation progress
 
+## Progress report — 2026-11-09
+
+These are engineering-completion estimates, not release-readiness claims. They count implemented scope and account for remaining runtime and live-service verification.
+
+| Area | Estimate | Current state |
+|---|---:|---|
+| Unified shell, design system, navigation, settings, and shared search | 75% | Original SwiftUI shell, shared artwork/palette, category browsing, unified search, and feature boundaries are in place; accessibility and device polish still need review. |
+| Local catalog and music | 70% | Import, metadata, playback queue, playlists, grouping, and reusable local/music views are implemented; end-to-end device checks remain. |
+| Video | 55% | AVPlayer playback, full-screen controls, and embedded track selection exist; external subtitles, format-gap analysis, and MPVKit decision remain. |
+| Books | 60% | Readium EPUB plus app-owned CBZ navigation, progress, bookmarks, and reader customization exist; simulator verification remains and CBR is unsupported. |
+| Jellyfin | 70% | Authentication, paginated catalog, search, favorites, artwork, playback and progress reporting are wired; live-server validation remains. |
+| Games | 40% | Local catalog and JellyEmu-hosted game launch are represented; no native local emulator runtime is linked, and live plugin/device checks remain. |
+| Integration and release verification | 30% | Recent GitHub checkpoints have validated multiple refactors and importer behavior; broader device, server, licensing, and distribution checks remain. |
+
+**Overall estimate: about 60%.** Core cross-media structure and several useful workflows are present, but game-runtime scope, live-server/device testing, format coverage, and release audits keep this well short of a finished product.
+
 ## Phase 1 — Product shell and source assessment
 
 - [x] Inspect the six available source checkouts and record platform, extension points, and licensing constraints.
@@ -20,7 +36,8 @@
 - [x] Add a persistent library sort setting for recent additions, recent openings, or title while retaining home recency ordering (runner verification pending).
 - [x] Group unified search results by local/Jellyfin source, trim surrounding query whitespace, filter both sources by media kind, show a no-results state, and provide a clear-search action (user-confirmed GitHub checkpoint passed).
 - [x] Surface missing imported files in local media details, disable open/play actions for missing files, and roll back local favorite changes when persistence fails (runner verification pending).
-- [x] Move local media rows and details, including persistence-aware favorites/removal and Readium launch, into a local-library feature source while preserving use from category browsing and unified search (static review complete; runner verification pending).
+- [x] Move local media rows and details, including persistence-aware favorites/removal and Readium launch, into a local-library feature source while preserving use from category browsing and unified search (user-confirmed GitHub checkpoint passed).
+- [x] Move playlist editing, playlist details/reordering, and album/artist track detail screens into a dedicated music-library feature file (static review complete; runner verification pending).
 - [x] Confirm media removal, delete its imported file and artwork after catalog save, remove playlist references and queued entries, and stop it if currently playing.
 - [x] Add AVPlayer-based local audio/video controls and progress checkpoints.
 - [x] Add a manually triggered GitHub Actions workflow and first importer unit tests.
@@ -124,4 +141,4 @@
 
 ## Verification policy
 
-This project is being edited on Windows without Xcode or iOS Simulator. The user confirmed the GitHub iOS checkpoint passed on commit `936f09a8090fee1a2d31c72339f478c5842e2372`, including the full-screen video player, then confirmed later checkpoints for Jellyfin pagination (`ca55c2e`), album track browsing (`f682068`), artist album browsing (`5d40a98`), playlist browsing (`808bf2a`), remote album/playlist queue support (`586b42e`), AVPlayer failure/buffering reporting (`49ac323`), playback-profile negotiation with HLS subtitle support (`772858c`), artwork caching (`7eee169`), and JellyEmu token/subframe scoping (`789a70d`). The user reported success for the follow-up configured-origin guard, but local `HEAD` remains `789a70d` with uncommitted guard changes; do not attribute that result to a commit until the checkout advances. Local and live-server verification details are still listed separately below. Live game playback still needs a JellyEmu-enabled server and simulator/device verification. Device playback, artwork extraction, reader presentation, video track selection, game UI, and other live Jellyfin behavior also remain runtime checks.
+This project is being edited on Windows without Xcode or iOS Simulator. The user confirmed the GitHub iOS checkpoint passed on commit `936f09a8090fee1a2d31c72339f478c5842e2372`, including the full-screen video player, then confirmed later checkpoints for Jellyfin pagination (`ca55c2e`), album track browsing (`f682068`), artist album browsing (`5d40a98`), playlist browsing (`808bf2a`), remote album/playlist queue support (`586b42e`), AVPlayer failure/buffering reporting (`49ac323`), playback-profile negotiation with HLS subtitle support (`772858c`), artwork caching (`7eee169`), JellyEmu token/subframe scoping (`789a70d`), and the local-library feature extraction. The user reported success for the follow-up configured-origin guard, but local `HEAD` remains `789a70d` with uncommitted guard changes; do not attribute that result to a commit until the checkout advances. The current `MusicLibraryFeature.swift` extraction has only been statically reviewed and still needs a GitHub checkpoint. Local and live-server verification details are still listed separately below. Live game playback still needs a JellyEmu-enabled server and simulator/device verification. Device playback, artwork extraction, reader presentation, video track selection, game UI, and other live Jellyfin behavior also remain runtime checks.
