@@ -707,6 +707,8 @@ struct AppShellView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Now playing: \(item.title)")
+                .accessibilityHint("Open playback controls")
                 Button { playback.togglePlayback() } label: {
                     Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 15, weight: .bold)).foregroundStyle(.white).frame(width: 36, height: 36)
                 }

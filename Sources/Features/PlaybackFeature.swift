@@ -12,6 +12,7 @@ struct NowPlayingSheet: View {
                 Text("NOW PLAYING").font(.system(size: 10, weight: .bold, design: .rounded)).tracking(1.3).foregroundStyle(MediaPalette.muted)
                 Spacer()
                 Button { dismiss() } label: { Image(systemName: "chevron.down").font(.system(size: 13, weight: .bold)).foregroundStyle(.white).padding(9).background(MediaPalette.surface, in: Circle()) }
+                    .accessibilityLabel("Close now playing")
             }
             if let item = playback.currentItem {
                 if item.kind == .video {
@@ -34,18 +35,33 @@ struct NowPlayingSheet: View {
                     Text(item.creator.isEmpty ? "\(item.kind.title) · \(item.origin == "Jellyfin" ? "Jellyfin server" : "Local library")" : item.creator)
                         .font(.system(size: 13, design: .rounded)).foregroundStyle(MediaPalette.muted)
                 }
-                Slider(value: Binding(get: { playback.elapsedSeconds }, set: { playback.seek(to: $0) }), in: 0...max(playback.durationSeconds, 1)).tint(MediaPalette.accent)
+                Slider(value: Binding(get: { playback.elapsedSeconds }, set: { playback.seek(to: $0) }), in: 0...max(playback.durationSeconds, 1))
+                    .tint(MediaPalette.accent)
+                    .accessibilityLabel("Playback position")
+                    .accessibilityValue(Text("\(timeLabel(playback.elapsedSeconds)) of \(timeLabel(playback.durationSeconds))"))
+                    .accessibilityAdjustableAction { direction in
+                        switch direction {
+                        case .increment: playback.seek(to: playback.elapsedSeconds + 15)
+                        case .decrement: playback.seek(to: max(0, playback.elapsedSeconds - 15))
+                        @unknown default: break
+                        }
+                    }
                 HStack { Text(timeLabel(playback.elapsedSeconds)); Spacer(); Text(timeLabel(playback.durationSeconds)) }
                     .font(.system(size: 10, design: .rounded)).foregroundStyle(MediaPalette.muted)
                 HStack(spacing: 38) {
                     Button { playback.playPrevious() } label: { Image(systemName: "backward.end.fill") }
+                        .accessibilityLabel("Previous item")
                     Button { playback.seek(to: max(0, playback.elapsedSeconds - 15)) } label: { Image(systemName: "gobackward.15") }
+                        .accessibilityLabel("Rewind 15 seconds")
                     Button { playback.togglePlayback() } label: {
                         Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 21, weight: .bold))
                             .foregroundStyle(MediaPalette.background).frame(width: 60, height: 60).background(MediaPalette.accent, in: Circle())
                     }
+                    .accessibilityLabel(playback.isPlaying ? "Pause" : "Play")
                     Button { playback.seek(to: playback.elapsedSeconds + 15) } label: { Image(systemName: "goforward.15") }
+                        .accessibilityLabel("Forward 15 seconds")
                     Button { playback.playNext() } label: { Image(systemName: "forward.end.fill") }
+                        .accessibilityLabel("Next item")
                 }
                 .font(.system(size: 20, weight: .medium)).foregroundStyle(.white)
                 UpNextQueuePanel(playback: playback)
@@ -59,7 +75,13 @@ struct NowPlayingSheet: View {
 
     private func timeLabel(_ seconds: Double) -> String {
         guard seconds.isFinite, seconds >= 0 else { return "0:00" }
-        return "\(Int(seconds) / 60):\(String(format: "%02d", Int(seconds) % 60))"
+        let wholeSeconds = Int(seconds)
+        let minutes = wholeSeconds / 60
+        let secondsPart = String(format: "%02d", wholeSeconds % 60)
+        if minutes >= 60 {
+            return "\(minutes / 60):\(String(format: "%02d", minutes % 60)):\(secondsPart)"
+        }
+        return "\(minutes):\(secondsPart)"
     }
 
     @ViewBuilder
@@ -180,6 +202,8 @@ struct UpNextQueuePanel: View {
                 .padding(.top, 5).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Up Next, \(playback.upcomingItems.count) queued items")
+            .accessibilityHint(isExpanded ? "Collapse queue" : "Expand queue")
             if isExpanded {
                 if playback.upcomingItems.isEmpty {
                     Text("Nothing queued after this item.")
@@ -204,6 +228,7 @@ struct UpNextQueuePanel: View {
                                         .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                                     }
                                     .buttonStyle(.plain)
+                                    .accessibilityLabel("Play \(queuedItem.title)")
                                     Menu {
                                         if offset > 0 {
                                             Button("Move to next", systemImage: "arrow.up.to.line") {
@@ -225,6 +250,7 @@ struct UpNextQueuePanel: View {
                                         Image(systemName: "ellipsis").font(.system(size: 12, weight: .semibold))
                                             .foregroundStyle(MediaPalette.muted).frame(width: 30, height: 38)
                                     }
+                                    .accessibilityLabel("Queue actions for \(queuedItem.title)")
                                 }
                                 .padding(7).background(MediaPalette.surface.opacity(0.75), in: RoundedRectangle(cornerRadius: 12))
                             }
